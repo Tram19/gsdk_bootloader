@@ -557,7 +557,7 @@ public:
      * @param limitAngle: limit angle.
      * @return None
      */
-    Gimbal_Protocol::result_t set_limit_angle_pitch(const limit_angle_t &limit_angle);
+    Gimbal_Protocol::result_t set_limit_angle_pitch(limit_angle_t &limit_angle);
 
     /**
      * @brief Get limit angle for pitch.

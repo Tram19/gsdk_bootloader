@@ -476,6 +476,18 @@ void Gimbal_Interface::param_process(void)
                 // // parameters done initializing,
                 if (params_initialized()) {
                     for (uint8_t i = 0; i < GIMBAL_NUM_TRACKED_PARAMS; i++) {
+                        if ((strcmp("RC_LIM_MIN_TILT",_params_list[i].gmb_id) == 0))
+                        {
+                            GSDK_DebugInfo("Check [%s] %d\n", "RC_LIM_MAX_TILT_UP",- _params_list[i].value);
+                            continue;
+                        }
+                        
+                        if ((strcmp("RC_LIM_MAX_TILT",_params_list[i].gmb_id) == 0))
+                        {
+                            GSDK_DebugInfo("Check [%s] %d\n", "RC_LIM_MAX_TILT_DOWN",- _params_list[i].value);
+                            continue;
+                        }
+
                         GSDK_DebugInfo("Check [%s] %d\n", _params_list[i].gmb_id, _params_list[i].value);
                     }
 
@@ -1461,8 +1473,12 @@ Gimbal_Protocol::result_t Gimbal_Interface::set_gimbal_return_home_when_change_m
  * @param limitAngle: limit angle.
  * @return None
  */
-Gimbal_Protocol::result_t Gimbal_Interface::set_limit_angle_pitch(const limit_angle_t &limit_angle)
+Gimbal_Protocol::result_t Gimbal_Interface::set_limit_angle_pitch(limit_angle_t &limit_angle)
 {
+    int16_t temp_limit = limit_angle.angle_min;
+    limit_angle.angle_min = - limit_angle.angle_max;
+    limit_angle.angle_max = - temp_limit;
+
     return (set_param(GMB_PARAM_MIN_LIMIT_ANGLE_PITCH, (int16_t)limit_angle.angle_min) == Gimbal_Protocol::SUCCESS &&
             set_param(GMB_PARAM_MAX_LIMIT_ANGLE_PITCH, (int16_t)limit_angle.angle_max) == Gimbal_Protocol::SUCCESS) ? Gimbal_Protocol::SUCCESS : Gimbal_Protocol::ERROR;
 }
@@ -1479,11 +1495,11 @@ Gimbal_Interface::limit_angle_t Gimbal_Interface::get_limit_angle_pitch(void)
     limit_angle_t limit_angle = { 0 };
     int16_t ret = 0;
 
-    if (get_param(GMB_PARAM_MIN_LIMIT_ANGLE_PITCH, ret) == Gimbal_Protocol::SUCCESS)
-        limit_angle.angle_min = ret;
-
     if (get_param(GMB_PARAM_MAX_LIMIT_ANGLE_PITCH, ret) == Gimbal_Protocol::SUCCESS)
-        limit_angle.angle_max = ret;
+        limit_angle.angle_min = - ret;
+
+    if (get_param(GMB_PARAM_MIN_LIMIT_ANGLE_PITCH, ret) == Gimbal_Protocol::SUCCESS)
+        limit_angle.angle_max = - ret;
 
     return limit_angle;
 }
