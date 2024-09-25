@@ -822,26 +822,26 @@ Gimbal_Protocol::result_t Gimbal_Interface::set_gimbal_rotation_sync(float pitch
         return Gimbal_Protocol::ERROR;
     }
     
-    limit_angle_t limit = get_limit_angle_pitch();
-    if (pitch > limit.angle_max || pitch < limit.angle_min)
-    {
-        GSDK_DebugError("ERROR: Pitch angle out of range! Acceptable range is %d° to %d°.",limit.angle_min,limit.angle_max);
-        return Gimbal_Protocol::ERROR;
-    }
+    // limit_angle_t limit = get_limit_angle_pitch();
+    // if (pitch > limit.angle_max || pitch < limit.angle_min)
+    // {
+    //     GSDK_DebugError("ERROR: Pitch angle out of range! Acceptable range is %d° to %d°.",limit.angle_min,limit.angle_max);
+    //     return Gimbal_Protocol::ERROR;
+    // }
     
-    limit = get_limit_angle_roll();
-    if (roll > limit.angle_max || roll < limit.angle_min)
-    {
-        GSDK_DebugError("ERROR: Roll angle out of range! Acceptable range is %d° to %d°.",limit.angle_min,limit.angle_max);
-        return Gimbal_Protocol::ERROR;
-    }
+    // limit = get_limit_angle_roll();
+    // if (roll > limit.angle_max || roll < limit.angle_min)
+    // {
+    //     GSDK_DebugError("ERROR: Roll angle out of range! Acceptable range is %d° to %d°.",limit.angle_min,limit.angle_max);
+    //     return Gimbal_Protocol::ERROR;
+    // }
     
-    limit = get_limit_angle_yaw();
-    if (yaw > limit.angle_max || yaw < limit.angle_min)
-    {
-        GSDK_DebugError("ERROR: Yaw angle out of range! Acceptable range is %d° to %d°.",limit.angle_min,limit.angle_max);
-        return Gimbal_Protocol::ERROR;
-    }
+    // limit = get_limit_angle_yaw();
+    // if (yaw > limit.angle_max || yaw < limit.angle_min)
+    // {
+    //     GSDK_DebugError("ERROR: Yaw angle out of range! Acceptable range is %d° to %d°.",limit.angle_min,limit.angle_max);
+    //     return Gimbal_Protocol::ERROR;
+    // }
 
     return _gimbal_proto->set_gimbal_move_sync(pitch, roll, yaw, Gimbal_Protocol::INPUT_ANGLE);
 }
@@ -859,13 +859,13 @@ Gimbal_Protocol::result_t Gimbal_Interface::set_gimbal_rotation_rate_sync(float 
         return Gimbal_Protocol::ERROR;
     }
 
-    if (pitch >  MAX_ROTATION_RATE || pitch < -MAX_ROTATION_RATE ||
-        roll  >  MAX_ROTATION_RATE || roll  < -MAX_ROTATION_RATE ||
-        yaw   >  MAX_ROTATION_RATE || yaw   < -MAX_ROTATION_RATE    )
-    {
-        GSDK_DebugError("ERROR: You are moving the gimbal too fast!!!");
-        return Gimbal_Protocol::ERROR;
-    }
+    // if (pitch >  MAX_ROTATION_RATE || pitch < -MAX_ROTATION_RATE ||
+    //     roll  >  MAX_ROTATION_RATE || roll  < -MAX_ROTATION_RATE ||
+    //     yaw   >  MAX_ROTATION_RATE || yaw   < -MAX_ROTATION_RATE    )
+    // {
+    //     GSDK_DebugError("ERROR: You are moving the gimbal too fast!!!");
+    //     return Gimbal_Protocol::ERROR;
+    // }
     
 
     return _gimbal_proto->set_gimbal_move_sync(pitch, roll, yaw, Gimbal_Protocol::INPUT_SPEED);
@@ -1679,6 +1679,8 @@ Gimbal_Protocol::result_t Gimbal_Interface::request_param_list(void)
 // ------------------------------------------------------------------------------
 //   Write heartbeat Message
 // ------------------------------------------------------------------------
+static uint64_t now = 0;
+static uint64_t pre = 0;
 void Gimbal_Interface::write_heartbeat(void)
 {
     mavlink_heartbeat_t heartbeat = { 0 };
@@ -1699,6 +1701,8 @@ void Gimbal_Interface::write_heartbeat(void)
     // --------------------------------------------------------------------------
     if (write_message(message) <= 0)
         GSDK_DebugError("WARNING: could not send HEARTBEAT\n");
+
+    
 }
 
 // ------------------------------------------------------------------------------
@@ -1706,6 +1710,7 @@ void Gimbal_Interface::write_heartbeat(void)
 // ------------------------------------------------------------------------------
 void Gimbal_Interface::start()
 {
+    time_to_exit = false;
     int result = 0;
 
     // --------------------------------------------------------------------------
@@ -1774,8 +1779,12 @@ void Gimbal_Interface::stop()
     // signal exit
     time_to_exit = true;
     // wait for exit
-    pthread_join(read_tid, NULL);
-    pthread_join(write_tid, NULL);
+    // pthread_join(read_tid, NULL);
+    // pthread_join(write_tid, NULL);
+    writing_status = THREAD_NOT_INIT;
+    reading_status = THREAD_NOT_INIT;
+    pthread_cancel(read_tid);
+    pthread_cancel(write_tid);
     // now the read and write threads are closed
     // still need to close the _serial_port separately
 }
@@ -1888,6 +1897,7 @@ void Gimbal_Interface::read_thread(void)
                 for (int i = 0; i < result; ++i) {
                     // the parsing
                     if (mavlink_parse_char(_channel, (uint8_t)buf[i], &message, &mav_status)) {
+                        // printf("Parse error: %u, Drop: %u, Success: %u\n",mav_status.parse_error,mav_status.packet_rx_drop_count,mav_status.packet_rx_success_count);
                         messages_handler(message);
                     }
                 }
