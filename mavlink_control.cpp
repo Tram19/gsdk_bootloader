@@ -583,7 +583,7 @@ static void control_sample_gimbal_process(Gimbal_Interface &onboard, Serial_Port
         case 11: // Set Gimbal to MAPPING mode
         {
             Gimbal_Interface::fw_version_t fw = onboard.get_gimbal_version();
-            if((fw.x >= 7 && fw.y >= 8 && fw.z >= 1) || mav_gimbal_proto == Gimbal_Interface::MAVLINK_GIMBAL_V1){
+            if((fw.x *100 + fw.y * 10 + fw.z >= 781) || mav_gimbal_proto == Gimbal_Interface::MAVLINK_GIMBAL_V1){
                 control_sample_gimbal_set_mapping_mode(onboard);
             }
             else{
@@ -634,7 +634,7 @@ static void setting_sample_gimbal_setup_param_startup(Gimbal_Interface &onboard)
     Gimbal_Interface::fw_version_t fw = onboard.get_gimbal_version();
     GSDK_DebugInfo("Gimbal Firmware version is %d.%d.%d.%s", fw.x, fw.y, fw.z, fw.type);
 
-    if(fw.x <= 7 && fw.y <= 7 && fw.z <= 3){
+    if(fw.x * 100 + fw.y * 10 + fw.z <= 773){
         while(1){
             GSDK_DebugInfo("\n\rCurrent gSDK not support for this gimbal firmware version !!!\n\r"
             "Please contact to GREMSY support team for get correct version !!!\n\r"
