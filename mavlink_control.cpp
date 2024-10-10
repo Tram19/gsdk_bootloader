@@ -268,7 +268,7 @@ void gGimbal_displays(Gimbal_Interface &onboard){
     attitude<int16_t> myencoder;
     myencoder = onboard.get_gimbal_encoder();
 
-    GSDK_DebugInfo("Gimbal encoder Pitch - Roll - Yaw: (%.2f) - (%.2f) - (%.2f)\n" ,myencoder.pitch, myencoder.roll, myencoder.yaw);
+    GSDK_DebugInfo("Gimbal encoder Pitch - Roll - Yaw: (%d) - (%d) - (%d)\n" ,myencoder.pitch, myencoder.roll, myencoder.yaw);
 
     Gimbal_Interface::gimbal_config_axis_t new_config = onboard.get_gimbal_config_tilt_axis();
 
@@ -683,16 +683,16 @@ static void setting_sample_gimbal_setup_param_startup(Gimbal_Interface &onboard)
     //     /* code */
     //     res = onboard.set_gimbal_return_home_when_change_mode(true);
     // } while (res != Gimbal_Protocol::SUCCESS);
-
+    int temp_gimbal_type; 
     do
     {
-        GSDK_DebugMsg("Please Enter number to select type of gimbal\n\r");
+        GSDK_DebugMsg("\t\n\r Please Enter number to select type of gimbal\n\r");
         GSDK_DebugMsg("\t 1. Two axis\n\r");
         GSDK_DebugMsg("\t 2. Three axis\n\r");
-        scanf("%d",&gimbal_mode.gimbal_type);
+        scanf("%d", &temp_gimbal_type);
         getchar();
-
-    } while (!(gimbal_mode.gimbal_type == TWO_AXIS || gimbal_mode.gimbal_type == THREE_AXIS));
+    } while (!(temp_gimbal_type == (int)TWO_AXIS || temp_gimbal_type == (int)THREE_AXIS));
+    gimbal_mode.gimbal_type = (enum type_of_gimbal) temp_gimbal_type;   
     
     if(gimbal_mode.gimbal_type == TWO_AXIS){
 
@@ -701,7 +701,7 @@ static void setting_sample_gimbal_setup_param_startup(Gimbal_Interface &onboard)
             GSDK_DebugMsg("Please Enter number to select two axis gimbal mount mode \n\r");
             GSDK_DebugMsg("\t 1. Roll-Tilt Mount\n\r");
             GSDK_DebugMsg("\t 2. Pan-Tilt Mount\n\r");
-            scanf("%d", &gimbal_mode.mnt_mode);
+            scanf("%hhu", &gimbal_mode.mnt_mode);
             getchar();
         } while (!(gimbal_mode.mnt_mode == TWO_AXIS_GIMBAL_MOUNT_MODE_PAN_TILT || gimbal_mode.mnt_mode == TWO_AXIS_GIMBAL_MOUNT_MODE_ROLL_TILT));
         
@@ -712,7 +712,7 @@ static void setting_sample_gimbal_setup_param_startup(Gimbal_Interface &onboard)
             GSDK_DebugMsg("Please Enter number to select three axis gimbal mode \n\r");
             GSDK_DebugMsg("\t 1. Normal mode\n\r");
             GSDK_DebugMsg("\t 2. Inverted mode\n\r");
-            scanf("%d", &gimbal_mode.mnt_mode);
+            scanf("%hhu", &gimbal_mode.mnt_mode);
             gimbal_mode.mnt_mode = gimbal_mode.mnt_mode + OFFSET;
         } while (!(gimbal_mode.mnt_mode == THREE_AXIS_GIMBAL_MOUNT_NORMAL_MODE || gimbal_mode.mnt_mode == THREE_AXIS_GIMBAL_MOUNT_INVERTED_MODE));
     }
@@ -1038,15 +1038,16 @@ static void control_sample_gimbal_on(Gimbal_Interface &onboard){
 
 static void control_sample_gimbal_change_mount_mode(Gimbal_Interface &onboard)
 {
+    int temp_gimbal_type; 
     do
     {
         GSDK_DebugMsg("\t\n\r Please Enter number to select type of gimbal\n\r");
         GSDK_DebugMsg("\t 1. Two axis\n\r");
         GSDK_DebugMsg("\t 2. Three axis\n\r");
-        scanf("%d",&gimbal_mode.gimbal_type);
+        scanf("%d", &temp_gimbal_type);
 
-    } while (!(gimbal_mode.gimbal_type == TWO_AXIS || gimbal_mode.gimbal_type == THREE_AXIS));
-    
+    } while (!(temp_gimbal_type == (int)TWO_AXIS || temp_gimbal_type == (int)THREE_AXIS));
+    gimbal_mode.gimbal_type = (enum type_of_gimbal) temp_gimbal_type;   
     if(gimbal_mode.gimbal_type == TWO_AXIS)
     {
 
@@ -1055,7 +1056,7 @@ static void control_sample_gimbal_change_mount_mode(Gimbal_Interface &onboard)
             GSDK_DebugMsg("\t\n\r Please Enter number to select two axis gimbal mount mode \n\r");
             GSDK_DebugMsg("\t 1. Roll-Tilt Mount\n\r");
             GSDK_DebugMsg("\t 2. Pan-Tilt Mount\n\r");
-            scanf("%d", &gimbal_mode.mnt_mode);
+            scanf("%hhu", &gimbal_mode.mnt_mode);
         } while (!(gimbal_mode.mnt_mode == TWO_AXIS_GIMBAL_MOUNT_MODE_PAN_TILT || gimbal_mode.mnt_mode == TWO_AXIS_GIMBAL_MOUNT_MODE_ROLL_TILT));
         
     }
@@ -1068,7 +1069,7 @@ static void control_sample_gimbal_change_mount_mode(Gimbal_Interface &onboard)
             GSDK_DebugMsg("\t\n\r Please Enter number to select three axis gimbal mode \n\r");
             GSDK_DebugMsg("\t 1. Normal mode\n\r");
             GSDK_DebugMsg("\t 2. Inverted mode\n\r");
-            scanf("%d", &gimbal_mode.mnt_mode);
+            scanf("%hhu", &gimbal_mode.mnt_mode);
             gimbal_mode.mnt_mode = gimbal_mode.mnt_mode + OFFSET;
         } while (!(gimbal_mode.mnt_mode == THREE_AXIS_GIMBAL_MOUNT_NORMAL_MODE || gimbal_mode.mnt_mode == THREE_AXIS_GIMBAL_MOUNT_INVERTED_MODE));
     }
@@ -1570,7 +1571,7 @@ static void get_input_rate(float &pitch_rate,float &roll_rate, float &yaw_rate, 
 
     printf("\n");
     GSDK_DebugMsg("Duration (in seconds): ");
-    scanf("%u" , &duration);
+    scanf("%hhu" , &duration);
 }
 
 /************************ (C) COPYRIGHT Gremsy *****END OF FILE****************/

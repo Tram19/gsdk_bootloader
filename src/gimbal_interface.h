@@ -793,10 +793,10 @@ private:
 
     interface_state_t _state = GIMBAL_STATE_NOT_PRESENT;
 
-    static constexpr char *alpha    = "ALPHA";
-    static constexpr char *beta     = "BETA";
-    static constexpr char *preview  = "PREVIEW";
-    static constexpr char *official = "OFFICIAL";
+    static constexpr const char *alpha    = "ALPHA";
+    static constexpr const char *beta     = "BETA";
+    static constexpr const char *preview  = "PREVIEW";
+    static constexpr const char *official = "OFFICIAL";
 
     /**
      * @brief Function check if compid is gimbal

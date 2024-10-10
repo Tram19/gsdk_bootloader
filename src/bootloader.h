@@ -43,7 +43,7 @@ public:
 
 private:
 
-    typedef struct buffer
+    struct buffer
     {
         uint8_t  data[STM32_MAX_RX_FRAME];
         uint16_t head;
@@ -71,7 +71,7 @@ private:
         COUNT,
     } ;
 
-    typedef struct stm32_cmd {
+    struct stm32_cmd {
 	uint8_t get;
 	uint8_t gvr;
 	uint8_t gid;
@@ -86,7 +86,7 @@ private:
 	uint8_t	crc;
     };
 
-    typedef struct devices_t
+    struct devices_t
     {
         uint16_t ID;
         string name;
@@ -98,7 +98,7 @@ private:
         uint32_t numBytes;
     };
 
-    typedef struct bin_t
+    struct bin_t
     {
         uint32_t address;
         uint32_t flash_count;
