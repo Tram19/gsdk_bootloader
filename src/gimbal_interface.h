@@ -41,10 +41,10 @@
 // ------------------------------------------------------------------------------
 
 //Be careful when modifying those definitions. It can cause your gimbal to malfunction.
-#define MAX_ORIENTATION_RATE    100
+#define MAX_ORIENTATION_RATE    55
 #define MAX_ATTITUDE_RATE       MAX_ORIENTATION_RATE
-#define MAX_IMU_RAW_RATE        50
-#define MAX_ENCODER_RATE        10
+#define MAX_IMU_RAW_RATE        55
+#define MAX_ENCODER_RATE        20
 // Max rotation rate in deg/s
 #define MAX_ROTATION_RATE       30
 
@@ -526,6 +526,12 @@ public:
      */
     Gimbal_Protocol::result_t request_gimbal_device_info(void);
 
+    /**
+     * @brief reuqest gimbal model name
+     * 
+     * @return string
+     */
+    uint16_t get_gimbal_name(char *name);
     /**
      * @brief Get the gimbal encoder type send
      *

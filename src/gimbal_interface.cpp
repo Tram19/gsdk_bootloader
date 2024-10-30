@@ -599,7 +599,7 @@ Gimbal_Protocol::result_t Gimbal_Interface::set_gimbal_motor(control_motor_t typ
             /* code */
             set_gimbal_rotation_rate_sync(0.f, 0.f, 0.f);
 
-            if (countTimeoutReached > 30) {
+            if (countTimeoutReached > 3) {
                 return Gimbal_Protocol::result_t::TIMEOUT;
             }
             countTimeoutReached += 1;
@@ -683,7 +683,7 @@ Gimbal_Protocol::result_t Gimbal_Interface::set_gimbal_lock_mode_sync(void)
             /* code */
             set_gimbal_rotation_rate_sync(0.f, 0.f, 0.f);
 
-            if (countTimeoutReached > 30) {
+            if (countTimeoutReached > 3) {
                 return Gimbal_Protocol::result_t::TIMEOUT;
             }
             countTimeoutReached += 1;
@@ -717,7 +717,7 @@ Gimbal_Protocol::result_t Gimbal_Interface::set_gimbal_follow_mode_sync(void)
             /* code */
             set_gimbal_rotation_rate_sync(0.f, 0.f, 0.f);
 
-            if (countTimeoutReached > 30) {
+            if (countTimeoutReached > 3) {
                 return Gimbal_Protocol::result_t::TIMEOUT;
             }
             countTimeoutReached += 1;
@@ -751,7 +751,7 @@ Gimbal_Protocol::result_t Gimbal_Interface::set_gimbal_mapping_sync(void)
 
             set_gimbal_rotation_rate_sync(0.f, 0.f, 0.f);
 
-            if (countTimeoutReached > 30) {
+            if (countTimeoutReached > 3) {
                 return Gimbal_Protocol::result_t::TIMEOUT;
             }
             countTimeoutReached += 1;
@@ -785,7 +785,7 @@ Gimbal_Protocol::result_t Gimbal_Interface::set_gimbal_return_home_sync(void)
 
             set_gimbal_rotation_rate_sync(0.f, 0.f, 0.f);
 
-            if (countTimeoutReached > 30) {
+            if (countTimeoutReached > 3) {
                 return Gimbal_Protocol::result_t::TIMEOUT;
             }
             countTimeoutReached += 1;
@@ -834,26 +834,26 @@ Gimbal_Protocol::result_t Gimbal_Interface::set_gimbal_rotation_sync(float pitch
         return Gimbal_Protocol::ERROR;
     }
     
-    // limit_angle_t limit = get_limit_angle_pitch();
-    // if (pitch > limit.angle_max || pitch < limit.angle_min)
-    // {
-    //     GSDK_DebugError("ERROR: Pitch angle out of range! Acceptable range is %d° to %d°.",limit.angle_min,limit.angle_max);
-    //     return Gimbal_Protocol::ERROR;
-    // }
+    limit_angle_t limit = get_limit_angle_pitch();
+    if (pitch > limit.angle_max || pitch < limit.angle_min)
+    {
+        GSDK_DebugError("ERROR: Pitch angle out of range! Acceptable range is %d° to %d°.",limit.angle_min,limit.angle_max);
+        return Gimbal_Protocol::ERROR;
+    }
     
-    // limit = get_limit_angle_roll();
-    // if (roll > limit.angle_max || roll < limit.angle_min)
-    // {
-    //     GSDK_DebugError("ERROR: Roll angle out of range! Acceptable range is %d° to %d°.",limit.angle_min,limit.angle_max);
-    //     return Gimbal_Protocol::ERROR;
-    // }
+    limit = get_limit_angle_roll();
+    if (roll > limit.angle_max || roll < limit.angle_min)
+    {
+        GSDK_DebugError("ERROR: Roll angle out of range! Acceptable range is %d° to %d°.",limit.angle_min,limit.angle_max);
+        return Gimbal_Protocol::ERROR;
+    }
     
-    // limit = get_limit_angle_yaw();
-    // if (yaw > limit.angle_max || yaw < limit.angle_min)
-    // {
-    //     GSDK_DebugError("ERROR: Yaw angle out of range! Acceptable range is %d° to %d°.",limit.angle_min,limit.angle_max);
-    //     return Gimbal_Protocol::ERROR;
-    // }
+    limit = get_limit_angle_yaw();
+    if (yaw > limit.angle_max || yaw < limit.angle_min)
+    {
+        GSDK_DebugError("ERROR: Yaw angle out of range! Acceptable range is %d° to %d°.",limit.angle_min,limit.angle_max);
+        return Gimbal_Protocol::ERROR;
+    }
 
     return _gimbal_proto->set_gimbal_move_sync(pitch, roll, yaw, Gimbal_Protocol::INPUT_ANGLE);
 }
@@ -871,13 +871,13 @@ Gimbal_Protocol::result_t Gimbal_Interface::set_gimbal_rotation_rate_sync(float 
         return Gimbal_Protocol::ERROR;
     }
 
-    // if (pitch >  MAX_ROTATION_RATE || pitch < -MAX_ROTATION_RATE ||
-    //     roll  >  MAX_ROTATION_RATE || roll  < -MAX_ROTATION_RATE ||
-    //     yaw   >  MAX_ROTATION_RATE || yaw   < -MAX_ROTATION_RATE    )
-    // {
-    //     GSDK_DebugError("ERROR: You are moving the gimbal too fast!!!");
-    //     return Gimbal_Protocol::ERROR;
-    // }
+    if (pitch >  MAX_ROTATION_RATE || pitch < -MAX_ROTATION_RATE ||
+        roll  >  MAX_ROTATION_RATE || roll  < -MAX_ROTATION_RATE ||
+        yaw   >  MAX_ROTATION_RATE || yaw   < -MAX_ROTATION_RATE    )
+    {
+        GSDK_DebugError("ERROR: You are moving the gimbal too fast!!!");
+        return Gimbal_Protocol::ERROR;
+    }
     
 
     return _gimbal_proto->set_gimbal_move_sync(pitch, roll, yaw, Gimbal_Protocol::INPUT_SPEED);
@@ -1405,6 +1405,13 @@ Gimbal_Protocol::result_t Gimbal_Interface::request_gimbal_device_info(void)
     return request_msg(MAVLINK_MSG_ID_GIMBAL_DEVICE_INFORMATION);
 }
 
+uint16_t Gimbal_Interface::get_gimbal_name(char *name)
+{
+    pthread_mutex_lock(&_messages.mutex);
+    strncpy(name,_messages.gimbal_device_info.model_name,32);
+    pthread_mutex_unlock(&_messages.mutex);
+    return 1;
+}
 /**
  * @brief Get the gimbal encoder type send
  *

@@ -124,6 +124,9 @@ static void control_sample_gimbal_return_home(Gimbal_Interface &onboard);
 static void control_sample_gimbal_reboot(Gimbal_Interface &onboard);
 
 static bool upgrade_firmware(Gimbal_Interface &onboard, Serial_Port &serial_port);
+
+static void monitor_attitude_imu_encoder(Gimbal_Interface &onboard, uint8_t duration);
+
 // ------------------------------------------------------------------------------
 //   Gimbal sample control and get data
 // ------------------------------------------------------------------------------
@@ -445,6 +448,8 @@ static void get_input_angle(float &pitch,float &roll, float &yaw);
 
 static void get_input_rate(float &pitch,float &roll, float &yaw, uint8_t &duration);
 
+static void get_input_duration(uint8_t &duration);
+
 static void control_sample_gimbal_process(Gimbal_Interface &onboard, Serial_Port &serial_port){
 
     if (onboard.present() == false) {
@@ -453,7 +458,7 @@ static void control_sample_gimbal_process(Gimbal_Interface &onboard, Serial_Port
 
     int number = 0;
 
-    printf("\33[39m\n\r Please Enter number [0-13] to seclect Gimbal control mode\n\r");
+    printf("\33[39m\n\r Please Enter number [0-15] to seclect Gimbal control mode\n\r");
     printf("\t 0.   OFF Gimbal\n\r");
     printf("\t 1.   ON Gimbal\n\r");
     printf("\t 2.   Change mount mode\n\r");
@@ -469,6 +474,7 @@ static void control_sample_gimbal_process(Gimbal_Interface &onboard, Serial_Port
     printf("\t 12.  Set Gimbal to Return Home\n\r");\
     printf("\t 13.  Set Gimbal Reboot\n\r");
     printf("\t 14.  Upgrade Firmware\n\r");
+    printf("\t 15.  Monitoring Encoder - Attitude - IMU\n\r");
 
     scanf("%d", &number);
 
@@ -582,16 +588,7 @@ static void control_sample_gimbal_process(Gimbal_Interface &onboard, Serial_Port
         break;
         case 11: // Set Gimbal to MAPPING mode
         {
-            Gimbal_Interface::fw_version_t fw = onboard.get_gimbal_version();
-            if((fw.x *100 + fw.y * 10 + fw.z >= 781) || mav_gimbal_proto == Gimbal_Interface::MAVLINK_GIMBAL_V1){
-                control_sample_gimbal_set_mapping_mode(onboard);
-            }
-            else{
-                GSDK_DebugWarning("This feature only support in case :\n\r"
-                "- Use Mavlink gimbal protocol V1\n\r"
-                "- Gimbal firmware version 7.8.1 and above\n\r")
-            }
-            
+            control_sample_gimbal_set_mapping_mode(onboard);
         }
         break;
 
@@ -613,10 +610,15 @@ static void control_sample_gimbal_process(Gimbal_Interface &onboard, Serial_Port
             upgrade_firmware(onboard,serial_port);
         }
             break;
+        case 15: // Monitoring
+        {
+            uint8_t duration = 0;
+            get_input_duration(duration);
+            monitor_attitude_imu_encoder(onboard,duration);
+        }
+            break;
         default:
         {
-            // setting_sample_set_limit_angle(onboard);  
-            onboard.set_gimbal_rotation_rate_sync(0, -10, -10);     
         }
         break;
     }
@@ -648,16 +650,30 @@ static void setting_sample_gimbal_setup_param_startup(Gimbal_Interface &onboard)
     onboard.request_gimbal_device_info();
     GSDK_DebugSuccess("Request gimbal device information.\n");
 
+    usleep(300000);
 
     {
-        char number = 0;
-        GSDK_DebugMsg("Please Enter y/n(yes or no) to setting gimbal mavlink message rate\n\r");
-        scanf("%c", &number);
-        getchar();
-        if(number == 'Y'|| number == 'y')
-        {
-        setting_sample_gimbal_setup_message_rate(onboard);
+        char gimbal_name[32] {0};
+        onboard.get_gimbal_name(gimbal_name);                
+        std::string gimbal_str(gimbal_name);
+        std::string search_str = "AEVO";
+        if (gimbal_str.find(search_str) != std::string::npos) {
+            GSDK_DebugWarning("The AEVO gimbal needs to have the message rate set to function properly!\n\r");
+            setting_sample_gimbal_setup_message_rate(onboard);
         }
+        else{
+            char number = 0;
+            GSDK_DebugMsg("Please Enter y/n(yes or no) to setting gimbal mavlink message rate\n\r");
+            scanf("%c", &number);
+            getchar();
+            if(number == 'Y'|| number == 'y')
+            {
+                setting_sample_gimbal_setup_message_rate(onboard);
+            }
+        }
+
+
+        
     }
 
     {
@@ -740,10 +756,15 @@ static void setting_sample_gimbal_setup_param_startup(Gimbal_Interface &onboard)
 }
 
 static void setting_sample_gimbal_setup_message_rate(Gimbal_Interface &onboard){
-    GSDK_DebugInfo("Setting gimbal mavlink message");
+    char gimbal_name[32] {0};
+    onboard.get_gimbal_name(gimbal_name);                
+    std::string gimbal_str(gimbal_name);
+    std::string search_str = "AEVO";
+    GSDK_DebugInfo("Setting gimbal mavlink message\n");
     int enc_value_rate;
     int orien_rate;
     int imu_rate;
+    set_encoder:
     GSDK_DebugMsg("Please Enter encoder messages rate (-1 for skip)\n");
     scanf("%d", &enc_value_rate);
     getchar();
@@ -768,7 +789,11 @@ static void setting_sample_gimbal_setup_message_rate(Gimbal_Interface &onboard){
         } while (result != 0);
 
         GSDK_DebugSuccess("Encoder message rate set successfully.\n");
+    }else if(gimbal_str.find(search_str) != std::string::npos && enc_value_rate <= 0) {
+        GSDK_DebugWarning("Please set message rate!");
+        goto set_encoder;
     }
+    set_orient:
     GSDK_DebugMsg("Please Enter mount orientation messages and attitude status messages rate (-1 for skip).\n\r");
     scanf("%d", &orien_rate);
     getchar();
@@ -806,7 +831,11 @@ static void setting_sample_gimbal_setup_message_rate(Gimbal_Interface &onboard){
             }
         } while (result != 0);
         GSDK_DebugSuccess("Gimbal device attitude status messages rate set successfully.\n");
+    }else if(gimbal_str.find(search_str) != std::string::npos && orien_rate <= 0) {
+        GSDK_DebugWarning("Please set message rate!");
+        goto set_orient;
     }
+    set_imu:
     GSDK_DebugMsg("Please Enter raw imu messages rate (-1 for skip)\n\r");
     scanf("%d", &imu_rate);
     getchar();
@@ -830,6 +859,9 @@ static void setting_sample_gimbal_setup_message_rate(Gimbal_Interface &onboard){
             }
         }  while (result != 0);
         GSDK_DebugSuccess("Raw imu messages rate set successfully.");
+    }else if(gimbal_str.find(search_str) != std::string::npos && imu_rate <= 0) {
+        GSDK_DebugWarning("Please set message rate!");
+        goto set_imu;
     }
 }
 
@@ -1503,25 +1535,62 @@ static bool upgrade_firmware(Gimbal_Interface &onboard, Serial_Port &serial_port
     return result;
 
 }
+
+static void monitor_attitude_imu_encoder(Gimbal_Interface &onboard,  uint8_t duration)
+{
+    Gimbal_Interface::imu_t my_imu;
+    attitude<float> myattitude;
+    attitude<int16_t> myencoder;
+
+    auto start = std::chrono::steady_clock::now();
+
+    do {
+        auto now = std::chrono::steady_clock::now();
+        auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - start);
+        if (elapsed.count() >= duration) {
+            break;
+        }
+        my_imu =  onboard.get_gimbal_raw_imu();
+        GSDK_DebugInfo("\n\nRaw imu:  xacc:%d, yacc:%d, zacc:%d, xgyro:%d, xgyro:%d, xgyro:%d(raw)\n",
+                                                        my_imu.accel.x,
+                                                        my_imu.accel.y,
+                                                        my_imu.accel.z,
+                                                        my_imu.gyro.x,
+                                                        my_imu.gyro.y,
+                                                        my_imu.gyro.z);
+        myattitude= onboard.get_gimbal_attitude();
+
+        GSDK_DebugInfo("Gimbal attitude Pitch - Roll - Yaw: (%.2f) - (%.2f) - (%.2f)\n" ,myattitude.pitch, myattitude.roll, myattitude.yaw);
+        myencoder = onboard.get_gimbal_encoder();
+
+        GSDK_DebugInfo("Gimbal encoder Pitch - Roll - Yaw: (%d) - (%d) - (%d)\n" ,myencoder.pitch, myencoder.roll, myencoder.yaw);
+        usleep(500000);
+    }while (1);
+
+    
+
+}
+
 static void get_input_angle(float &pitch,float &roll, float &yaw){
     if (gimbal_mode.gimbal_type == THREE_AXIS)
     {
-        GSDK_DebugMsg("ROLL angle: ");
-        scanf("%f" , &roll);
-        printf("\n");
+
         GSDK_DebugMsg("PITCH angle: ");
         scanf("%f" , &pitch);
+        printf("\n");
+        GSDK_DebugMsg("ROLL angle: ");
+        scanf("%f" , &roll);
         printf("\n");
         GSDK_DebugMsg("YAW angle: ");
         scanf("%f" , &yaw);
     }
     else if (gimbal_mode.gimbal_type == TWO_AXIS && gimbal_mode.mnt_mode == TWO_AXIS_GIMBAL_MOUNT_MODE_ROLL_TILT)
     {
-        GSDK_DebugMsg("ROLL angle: ");
-        scanf("%f" , &roll);
-        printf("\n");
         GSDK_DebugMsg("PITCH angle: ");
         scanf("%f" , &pitch);
+        printf("\n");
+        GSDK_DebugMsg("ROLL angle: ");
+        scanf("%f" , &roll);
         printf("\n");
         yaw = 0;
     }
@@ -1574,4 +1643,11 @@ static void get_input_rate(float &pitch_rate,float &roll_rate, float &yaw_rate, 
     scanf("%hhu" , &duration);
 }
 
+
+static void get_input_duration(uint8_t &duration)
+{
+    printf("\n");
+    GSDK_DebugMsg("Duration (in seconds): ");
+    scanf("%hhu" , &duration);
+}
 /************************ (C) COPYRIGHT Gremsy *****END OF FILE****************/
