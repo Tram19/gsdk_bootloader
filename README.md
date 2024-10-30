@@ -289,7 +289,7 @@ You selected gimbal mount mode
 Three axis Normal Mount
 
 
- Please Enter number [0-13] to seclect Gimbal control mode
+ Please Enter number [0-15] to seclect Gimbal control mode
          0.   OFF Gimbal
          1.   ON Gimbal
          2.   Change mount mode
