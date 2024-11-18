@@ -28,7 +28,7 @@ const int NUM_BYTES_IN_PAGE_F4_CUSTOM   = 128*1024; //128Kb
 static const int F4_MAP[]             = { 16,        16,         16,         16,         64,         128,        128,        128,        128,        128,        128,        128 };
 static const uint64_t F4_SECTOR_END_MAP [] = { 0X08003FFF, 0X08007FFF, 0X0800BFFF, 0X0800FFFF, 0X0801FFFF, 0X0803FFFF, 0X0805FFFF, 0X0807FFFF, 0X0809FFFF, 0X080BFFFF, 0X080DFFFF, 0X080FFFFF, };
 
-void *start_bootloader_read_thread(void *args);
+static void *start_bootloader_read_thread(void *args);
 // ----------------------------------------------------------------------------------
 //   Status bar
 // ------------------- ---------------------------------------------------------------

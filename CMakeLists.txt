@@ -17,6 +17,7 @@ set(MAVLINK_SRC
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}
                     ${CMAKE_CURRENT_SOURCE_DIR}/src
+                    ${CMAKE_CURRENT_SOURCE_DIR}/src/parsers
                     ${MAVLINK_INCLUDES}
                     )
 
@@ -31,7 +32,9 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}
 set(GSDK_APP_SRC
     mavlink_control.cpp
     ${MAVLINK_SRC}/parsers/utils.cpp
+    ${MAVLINK_SRC}/parsers/binary.c
     ${MAVLINK_SRC}/bootloader.cpp
+    ${MAVLINK_SRC}/bootloader_mavlink.cpp
     ${MAVLINK_SRC}/gimbal_interface.cpp
     ${MAVLINK_SRC}/gimbal_protocol.cpp
     ${MAVLINK_SRC}/gimbal_protocol_v1.cpp
