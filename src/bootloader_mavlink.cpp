@@ -1,6 +1,28 @@
+#include <filesystem>
+#include <iostream>
 #include "bootloader_mavlink.h"
 
+namespace fs = std::filesystem;
+// ----------------------------------------------------------------------------------
+//   Time
+// ------------------- ---------------------------------------------------------------
+static uint64_t get_time_usec()
+{
+    static struct timeval _timestamp;
+    gettimeofday(&_timestamp, NULL);
+    return _timestamp.tv_sec * 1000000 + _timestamp.tv_usec;
+}
+
+static uint64_t get_time_msec()
+{
+    static struct timeval _timestamp;
+    gettimeofday(&_timestamp, NULL);
+    return _timestamp.tv_sec * 1000 + _timestamp.tv_usec / 1000;
+}
+
 static void *start_bootloader_read_thread(void *args);
+
+static void *start_bootloader_write_thread(void *args);
 
 BootloaderMavlink::BootloaderMavlink(Serial_Port *serial_port , string path)
 {
@@ -13,8 +35,7 @@ BootloaderMavlink::~BootloaderMavlink()
     time_to_exit = true;
     this -> _serial_port->close_serial();
     this -> _serial_port = NULL;
-    pthread_cancel(read_tid);
-    binary_close(p_st);
+    close();
 }
 
 bool BootloaderMavlink::init()
@@ -23,9 +44,12 @@ bool BootloaderMavlink::init()
     {
         _serial_port->open_serial();
     }
+    pthread_mutex_init(&w_mutex, NULL);
     int result = pthread_create(&read_tid, NULL, &start_bootloader_read_thread, this);
     if (result) throw result;
 
+    result = pthread_create(&write_tid, NULL, &start_bootloader_read_thread, this);
+    if (result) throw result;
     // try to init parser
     p_st = binary_init();
     if (!p_st)
@@ -41,7 +65,17 @@ bool BootloaderMavlink::init()
     init_flag = true;
     return true;
 }
-
+bool BootloaderMavlink::close()
+{
+    if (init_flag)
+    {
+        pthread_mutex_destroy(&w_mutex);
+        pthread_cancel(read_tid);
+        pthread_cancel(write_tid);
+        binary_close(p_st);
+    }
+    return true;
+}
 bool BootloaderMavlink::run()
 {
     if (!init_flag)
@@ -52,53 +86,322 @@ bool BootloaderMavlink::run()
     uint8_t total_e = 0;
     while (1)
     {
+        uint64_t time  = lastest_timeslap_heartbeat();
+        if(time >= 13000)
+        {
+            printf("Timeout connection!\n");
+            return false;
+        }
+        else if(time < 10000 && time > 3000)
+        {
+            continue;
+        }
+        
         switch (state)
         {
         case CONNECT:
         {
-
-        }
-            break;
-        case PARSER:
-        {
-            if (parse_bin_and_send_seq())
+            err_t result = connect_seq();
+            if (result == ERR_OK)
             {
-                /* code */
+                state = SETBAUD;
             }
-            return true;
+            else if (result == ERR_SKIP)
+            {
+                state = TRANSMIT;
+            }
+            else
+            {
+                total_e++;
+            }
+            
         }
             break;
-        
+        case SETBAUD:
+        {
+            _serial_port->stop();
+            _serial_port->baudrate = 921600;
+            _serial_port->start();
+            timeslap_hb = get_time_msec() - 3001;// disconect
+        }
+            break;
+        case WAIT_SETBAUD:
+        {
+            state = TRANSMIT;
+        }
+            break;
+        case TRANSMIT:
+        {
+            if(parse_bin_and_send_seq() == ERR_OK)
+            {
+                return true;
+            }            
+            else
+            {
+                total_e++;
+            }
+        }
+            break;
         default:
             break;
+        }
+        
+        if (total_e >= 10)
+        {
+            return false;
         }
         
     }
     
 }
+uint64_t BootloaderMavlink::lastest_timeslap_heartbeat()
+{
+    uint64_t lastest_time = 0;
+    pthread_mutex_lock(&_messages.mutex);
+    lastest_time = get_time_msec() - timeslap_hb;
+    pthread_mutex_unlock(&_messages.mutex);
+    return (lastest_time);
+}
+bool BootloaderMavlink::w_message(const mavlink_message_t &message)
+{
+    pthread_mutex_lock(&w_mutex);
+    w_queue.push(message);
+    pthread_mutex_unlock(&w_mutex);
+
+}
+void  BootloaderMavlink::w_heartbeat()
+{
+    mavlink_heartbeat_t heartbeat = { 0 };
+    heartbeat.type 			= MAV_TYPE_ONBOARD_CONTROLLER;
+    heartbeat.autopilot 	= MAV_AUTOPILOT_INVALID;
+    heartbeat.base_mode 	= 0;
+    heartbeat.custom_mode 	= 0;
+    heartbeat.system_status = MAV_STATE_ACTIVE;
+    // --------------------------------------------------------------------------
+    //   ENCODE
+    // --------------------------------------------------------------------------
+    mavlink_message_t message = { 0 };
+
+    mavlink_msg_heartbeat_encode_chan(_system.sysid, _system.compid, _channel, &message, &heartbeat);
+
+    // --------------------------------------------------------------------------
+    //   WRITE
+    // --------------------------------------------------------------------------
+    if (w_message(message) <= 0)
+        printf("WARNING: could not send HEARTBEAT\n");
+
+}
+bool  BootloaderMavlink::w_serial_control_sync(const mavlink_serial_control_t &srl_send, mavlink_serial_control_t &srl_receive)
+{
+    mavlink_message_t message = { 0 };
+    mavlink_msg_serial_control_encode_chan(_system.sysid, _system.compid, _channel, &message, &srl_send);
+
+
+    struct timespec time_wait;
+    int rt = 0;
+    bool result = false;
+    clock_gettime(CLOCK_REALTIME, &time_wait);
+// Wait for 1 sec timeout
+    time_wait.tv_sec += 1;
+    w_message(message);
+    pthread_mutex_lock(&_messages.mutex_srl);
+    rt = pthread_cond_timedwait(&_messages._condition_srl, &_messages.mutex_srl, &time_wait);
+    if (rt != ETIMEDOUT) {
+        result = true;
+        memcpy(&srl_receive, &_messages.sr_ctl, sizeof(mavlink_serial_control_t));
+    }
+    pthread_mutex_unlock(&_messages.mutex_srl);
+
+    return result;
+}
+
+bool  BootloaderMavlink::w_ftp_sync(const PayloadHeader &ftp_send, PayloadHeader *ftp_receive)
+{
+    mavlink_message_t message = { 0 };
+    mavlink_msg_file_transfer_protocol_pack_chan(
+                                                _system.sysid, 
+                                                _system.compid, 
+                                                _channel, 
+                                                &message, 
+                                                0,
+                                                _gimbal.sysid,
+                                                _gimbal.compid,
+                                                reinterpret_cast<const uint8_t*>(&ftp_send));
+    struct timespec time_wait;
+    int rt = 0;
+    bool result = false;
+    clock_gettime(CLOCK_REALTIME, &time_wait);
+// Wait for 1 sec timeout
+    time_wait.tv_sec += 1;
+    w_message(message);
+    pthread_mutex_lock(&_messages.mutex_ftp);
+    rt = pthread_cond_timedwait(&_messages._condition_ftp, &_messages.mutex_ftp, &time_wait);
+    if (rt != ETIMEDOUT) {
+        if (_messages.ftp.target_system == _system.compid && _messages.ftp.target_system == _system.sysid)
+        {
+            result = true;
+            ftp_receive = reinterpret_cast<PayloadHeader*>(&_messages.ftp.payload[0]);
+        }
+    }
+    pthread_mutex_unlock(&_messages.mutex_ftp);
+    return result;
+}
+
+BootloaderMavlink::err_t BootloaderMavlink::connect_seq()
+{
+    mavlink_serial_control_t srl;
+    srl.device = SERIAL_CONTROL_SERIAL0;
+    srl.flags = SERIAL_CONTROL_FLAG_RESPOND;
+    srl.timeout = 1000; // timeout 1s
+    srl.baudrate = 921600;
+    srl.count = 0;
+    srl.target_system = _gimbal.sysid;
+    srl.target_component = _gimbal.compid;
+
+    mavlink_serial_control_t srl_receive;
+
+    if(!w_serial_control_sync(srl, srl_receive)) return ERR_TIMEOUT;
+
+    if (srl_receive.target_component != _system.compid && srl_receive.target_system != _system.sysid &&
+        srl_receive.device == SERIAL_CONTROL_SERIAL0 && srl_receive.flags == SERIAL_CONTROL_FLAG_REPLY)  return ERR_UNKNOWN;
+    
+    if (srl_receive.baudrate != srl.baudrate) return ERR_SKIP;
+
+    return ERR_OK;
+}
+
 BootloaderMavlink::err_t BootloaderMavlink::parse_bin_and_send_seq()
 {
     unsigned int size = 0;
-    uint64_t total_size = 0;
-    size = 256;
-    binArray.flash_data.resize(size);
-    uint16_t count = 0;
-    while (size > 0)
+    uint64_t total_size = binary_size(p_st);
+    PayloadHeader ftp_rq = {0};
+    PayloadHeader ftp_rs = {0};
+    StateUploadFile state_uploadfile = CREATE_FILE;
+    uint8_t       err = 0;
+    enum WriteDataState{
+        PASER,
+        SEND
+    };
+    uint32_t offset = 0;
+    
+    WriteDataState write_state = PASER;
+    while (1)
     {
-        if (binary_read(p_st,&binArray.flash_data,&size) != PARSER_ERR_OK)
+        switch (state_uploadfile)
         {
-            printf("Cannot read the bin file\n");
-            // return ERR_UNKNOWN;
+        case CREATE_FILE:
+        {
+
+            ftp_rq.seq_number++;
+            ftp_rq.session          = 0;
+            ftp_rq.opcode           = Opcode::CMD_CREATE_FILE;
+            string filename         = fs::path(path).filename() ;
+            ftp_rq.size             = filename.size();
+            size_t lengthToCopy     = (filename.size() > max_data_length - 1) ? max_data_length - 1 : filename.size();
+            memcpy(ftp_rq.data, filename.data(), lengthToCopy);
+            ftp_rq.burst_complete   = 0;
+            ftp_rq.offset           = 0;
+
+            if(!w_ftp_sync(ftp_rq, &ftp_rs))  
+            {
+                err ++;
+                break;
+            }
+
+            if (ftp_rs.req_opcode != Opcode::RSP_ACK || ftp_rs.seq_number != ftp_rq.seq_number)
+            {
+                err ++;
+                break;
+            }
+            
+            state_uploadfile = WRITE_DATA;
         }
-        count++;
-        printf("Read data => %u - %u\n" , size,count);
-        total_size += size;
+            break;
+        case WRITE_DATA:
+        {
+            
+            switch (write_state)
+            {
+            case PASER: // NO break in this case, for sending after parse
+            {
+                uint32_t left	= total_size - offset;
+                uint32_t len = max_data_length > left ? left : max_data_length;
+                uint32_t len_t = len;
+                if(binary_read(p_st,ftp_rq.data,&len) != PARSER_ERR_OK)
+                {
+                    err ++;
+                    break;
+                }
+                if (len == 0 && offset <= total_size)
+                {
+                    err ++;
+                    break;
+                }
+                ftp_rq.size = len;
+                offset += len;
+                write_state = SEND;
+            }
+            case SEND:
+            {
+                ftp_rq.seq_number++;
+                ftp_rq.opcode           = Opcode::CMD_WRITE_FILE;
+                if(!w_ftp_sync(ftp_rq, &ftp_rs))  
+                {
+                    err ++;
+                    break;
+                }
+
+                if (ftp_rs.req_opcode != Opcode::RSP_ACK || ftp_rs.seq_number != ftp_rq.seq_number)
+                {
+                    err ++;
+                    break;
+                }
+
+                write_state = PASER;
+            }
+                break;
+            default:
+                break;
+            }
+            // Make sure write all the file
+            if (offset >= total_size && write_state == PASER)
+            {
+                state_uploadfile = TERMINAL;
+                break;
+            }
+        }
+            break;
+        case TERMINAL:
+        {
+            ftp_rq.seq_number++;
+            ftp_rq.opcode           = Opcode::CMD_TERMINATE_SESSION;
+            ftp_rq.size             = 0;
+            if(!w_ftp_sync(ftp_rq, &ftp_rs))  
+            {
+                err ++;
+                break;
+            }
+
+            if (ftp_rs.req_opcode != Opcode::RSP_ACK || ftp_rs.seq_number != ftp_rq.seq_number)
+            {
+                err ++;
+                break;
+            }
+
+            return ERR_OK;
+        }
+            break;
+        default:
+            break;
+        }
+        
+        if (err > 6)
+        {
+            return ERR_UNKNOWN;
+        }
         
     }
     
-
-
-    printf("Read data => %u - E : %u\n",total_size,binary_size(p_st));
     return ERR_OK;
     
 }
@@ -108,6 +411,11 @@ BootloaderMavlink::err_t BootloaderMavlink::parse_bin_and_send_seq()
 void BootloaderMavlink::start_read_thread(void)
 {
     this->read_thread();
+}
+
+void BootloaderMavlink::start_write_thread(void)
+{
+    this->write_thread();
 }
 
 void BootloaderMavlink::read_thread(void)
@@ -123,13 +431,46 @@ void BootloaderMavlink::read_thread(void)
         {
             char buf[256] = { 0 };
             int result = _serial_port->read_message(buf, 256);
-                for (int i = 0; i < result; ++i) {
-                    // the parsing
-                    if (mavlink_parse_char(_channel, (uint8_t)buf[i], &message, &mav_status)) {
-                        messages_handler(message);
-                    }
+            for (int i = 0; i < result; ++i) {
+                // the parsing
+                if (mavlink_parse_char(_channel, (uint8_t)buf[i], &message, &mav_status)) {
+                    messages_handler(message);
                 }
+            }
         }
+    }
+}
+
+void  BootloaderMavlink::write_thread(void)
+{
+    uint64_t tnow_ms = 0;
+    uint64_t time_send_heartbeat_ms = 0;
+    mavlink_message_t message;
+    bool have_message = false;
+    // Blocking wait for new data
+    while (!time_to_exit) {
+        if (get_time_msec() - time_send_heartbeat_ms >= 1000) {
+            time_send_heartbeat_ms = get_time_msec();
+            // write a message and signal writing
+            w_heartbeat();
+
+        }
+        pthread_mutex_lock(&w_mutex);
+        if(w_queue.size() > 0)
+        {
+            message = w_queue.front();
+            w_queue.pop();
+            have_message = true;
+        }
+        pthread_mutex_unlock(&w_mutex);
+
+        if (have_message)
+        {
+            have_message = false;
+            uint16_t len = _serial_port->write_message(message);
+        }
+        
+        usleep(1000);
     }
 }
 bool BootloaderMavlink::is_gimbal(uint8_t compid)
@@ -159,17 +500,33 @@ void BootloaderMavlink::messages_handler(const mavlink_message_t &message)
         {
         case MAVLINK_MSG_ID_HEARTBEAT: 
         {
-
+            pthread_mutex_lock(&_messages.mutex);
+            mavlink_msg_heartbeat_decode(&message, &_messages.heartbeat);
+            if (!has_detected)
+            {
+                // Store message sysid and compid.
+                _gimbal.sysid  = message.sysid;
+                _gimbal.compid = message.compid;
+                has_detected = true;
+            }
+            timeslap_hb = get_time_msec();
+            pthread_mutex_unlock(&_messages.mutex);
         }
         break;
         case MAVLINK_MSG_ID_FILE_TRANSFER_PROTOCOL:
         {
-
+            pthread_mutex_lock(&_messages.mutex_ftp);
+            mavlink_msg_file_transfer_protocol_decode(&message, &_messages.ftp);
+            pthread_cond_signal(&_messages._condition_ftp);
+            pthread_mutex_unlock(&_messages.mutex_ftp);
         }
         break;
         case MAVLINK_MSG_ID_SERIAL_CONTROL:
         {
-
+            pthread_mutex_lock(&_messages.mutex_srl);
+            mavlink_msg_serial_control_decode(&message, &_messages.sr_ctl);
+            pthread_cond_signal(&_messages._condition_srl);
+            pthread_mutex_unlock(&_messages.mutex_srl);
         }
         break;
         default:
@@ -186,6 +543,15 @@ void *start_bootloader_read_thread(void *args)
     BootloaderMavlink *boot_loader = (BootloaderMavlink *)args;
     // run the object's read thread
     boot_loader->start_read_thread();
+    // done!
+    return NULL;
+}
+void *start_bootloader_write_thread(void *args)
+{
+    // takes an bootloader object argument
+    BootloaderMavlink *boot_loader = (BootloaderMavlink *)args;
+    // run the object's read thread
+    boot_loader->start_write_thread();
     // done!
     return NULL;
 }
