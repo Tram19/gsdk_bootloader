@@ -144,7 +144,7 @@ private:
     string		        path;
     Serial_Port         *_serial_port;
     void		        *p_st		        = NULL;
-    bool                time_to_exit        {true};  
+    bool                time_to_exit        {false};  
     bool                has_detected        {false};
     mavlink_channel_t   _channel            {MAVLINK_COMM_0};
     pthread_t           read_tid            = 0;
@@ -163,7 +163,7 @@ private:
     void  messages_handler(const mavlink_message_t &message);
 
     bool  w_serial_control_sync(const mavlink_serial_control_t &srl_send, mavlink_serial_control_t &srl_receive);
-    bool  w_ftp_sync(const PayloadHeader &ftp_send, PayloadHeader *ftp_receive);
+    bool  w_ftp_sync(const PayloadHeader &ftp_send, PayloadHeader &ftp_receive);
 
     void  w_heartbeat();
     bool  w_message(const mavlink_message_t &message);

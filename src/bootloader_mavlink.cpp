@@ -3,6 +3,7 @@
 #include "bootloader_mavlink.h"
 
 namespace fs = std::filesystem;
+uint32_t start_time;
 // ----------------------------------------------------------------------------------
 //   Time
 // ------------------- ---------------------------------------------------------------
@@ -42,13 +43,14 @@ bool BootloaderMavlink::init()
 {
     if (_serial_port->status != SERIAL_PORT_OPEN)
     {
+        _serial_port->baudrate = 460800;
         _serial_port->open_serial();
     }
     pthread_mutex_init(&w_mutex, NULL);
     int result = pthread_create(&read_tid, NULL, &start_bootloader_read_thread, this);
     if (result) throw result;
 
-    result = pthread_create(&write_tid, NULL, &start_bootloader_read_thread, this);
+    result = pthread_create(&write_tid, NULL, &start_bootloader_write_thread, this);
     if (result) throw result;
     // try to init parser
     p_st = binary_init();
@@ -63,6 +65,8 @@ bool BootloaderMavlink::init()
         return false;
 	}
     init_flag = true;
+    start_time = get_time_msec();
+    timeslap_hb = get_time_msec();
     return true;
 }
 bool BootloaderMavlink::close()
@@ -84,15 +88,16 @@ bool BootloaderMavlink::run()
         return false;
     }
     uint8_t total_e = 0;
+    
     while (1)
     {
         uint64_t time  = lastest_timeslap_heartbeat();
-        if(time >= 13000)
+        if (time > 10000)
         {
-            printf("Timeout connection!\n");
+            printf("Cannot communicate!\n");
             return false;
         }
-        else if(time < 10000 && time > 3000)
+        else if((time < 10000 && time > 3000) || !has_detected)
         {
             continue;
         }
@@ -104,14 +109,18 @@ bool BootloaderMavlink::run()
             err_t result = connect_seq();
             if (result == ERR_OK)
             {
+                printf("Set baud\n");
                 state = SETBAUD;
             }
             else if (result == ERR_SKIP)
             {
+                printf("Transmit\n");
                 state = TRANSMIT;
             }
             else
             {
+                printf("Connect err\n");
+                state = SETBAUD;
                 total_e++;
             }
             
@@ -120,9 +129,10 @@ bool BootloaderMavlink::run()
         case SETBAUD:
         {
             _serial_port->stop();
-            _serial_port->baudrate = 921600;
+            _serial_port->baudrate = 460800;
             _serial_port->start();
-            timeslap_hb = get_time_msec() - 3001;// disconect
+            state = WAIT_SETBAUD;
+            has_detected = false;
         }
             break;
         case WAIT_SETBAUD:
@@ -158,7 +168,7 @@ uint64_t BootloaderMavlink::lastest_timeslap_heartbeat()
 {
     uint64_t lastest_time = 0;
     pthread_mutex_lock(&_messages.mutex);
-    lastest_time = get_time_msec() - timeslap_hb;
+    lastest_time = get_time_msec() - (timeslap_hb);
     pthread_mutex_unlock(&_messages.mutex);
     return (lastest_time);
 }
@@ -167,7 +177,7 @@ bool BootloaderMavlink::w_message(const mavlink_message_t &message)
     pthread_mutex_lock(&w_mutex);
     w_queue.push(message);
     pthread_mutex_unlock(&w_mutex);
-
+    return 1;
 }
 void  BootloaderMavlink::w_heartbeat()
 {
@@ -215,9 +225,16 @@ bool  BootloaderMavlink::w_serial_control_sync(const mavlink_serial_control_t &s
     return result;
 }
 
-bool  BootloaderMavlink::w_ftp_sync(const PayloadHeader &ftp_send, PayloadHeader *ftp_receive)
+bool  BootloaderMavlink::w_ftp_sync(const PayloadHeader &ftp_send, PayloadHeader &ftp_receive)
 {
     mavlink_message_t message = { 0 };
+    const uint8_t * data = reinterpret_cast<const uint8_t*>(&ftp_send);
+    printf("seq_number : %u\n",ftp_send.seq_number);
+    printf("session : %u\n",ftp_send.session);
+    printf("OP code : %u\n",ftp_send.opcode);
+    printf("Data[0] : %u\n",data[0]);
+    printf("Data[1] : %u\n",data[1]);
+    printf("Data[2] : %u\n",data[2]);
     mavlink_msg_file_transfer_protocol_pack_chan(
                                                 _system.sysid, 
                                                 _system.compid, 
@@ -226,23 +243,39 @@ bool  BootloaderMavlink::w_ftp_sync(const PayloadHeader &ftp_send, PayloadHeader
                                                 0,
                                                 _gimbal.sysid,
                                                 _gimbal.compid,
-                                                reinterpret_cast<const uint8_t*>(&ftp_send));
+                                                data);
     struct timespec time_wait;
     int rt = 0;
     bool result = false;
     clock_gettime(CLOCK_REALTIME, &time_wait);
-// Wait for 1 sec timeout
+    // Wait for 1 sec timeout
     time_wait.tv_sec += 1;
     w_message(message);
     pthread_mutex_lock(&_messages.mutex_ftp);
     rt = pthread_cond_timedwait(&_messages._condition_ftp, &_messages.mutex_ftp, &time_wait);
     if (rt != ETIMEDOUT) {
-        if (_messages.ftp.target_system == _system.compid && _messages.ftp.target_system == _system.sysid)
+        if (_messages.ftp.target_component == _system.compid && _messages.ftp.target_system == _system.sysid)
         {
             result = true;
-            ftp_receive = reinterpret_cast<PayloadHeader*>(&_messages.ftp.payload[0]);
+            memcpy((&ftp_receive) , &_messages.ftp.payload[0] , sizeof(PayloadHeader));
+
+                printf("Payload[0] : %u\n",_messages.ftp.payload[0]);
+                printf("Payload[1] : %u\n",_messages.ftp.payload[1]);
+                printf("Payload[2] : %u\n",_messages.ftp.payload[2]);
+                printf("Payload[5] : %u\n",_messages.ftp.payload[5]);
+                printf("seq_number : %u\n",ftp_receive.seq_number);
+                printf("session : %u\n",ftp_receive.session);
+                printf("OP code : %u\n",ftp_receive.req_opcode);
+        }else
+        {
+            printf("Wrong ID\n");
         }
+        
+    }else
+    {
+        printf("Time out in FTP\n");
     }
+    
     pthread_mutex_unlock(&_messages.mutex_ftp);
     return result;
 }
@@ -253,7 +286,7 @@ BootloaderMavlink::err_t BootloaderMavlink::connect_seq()
     srl.device = SERIAL_CONTROL_SERIAL0;
     srl.flags = SERIAL_CONTROL_FLAG_RESPOND;
     srl.timeout = 1000; // timeout 1s
-    srl.baudrate = 921600;
+    srl.baudrate = 460800;
     srl.count = 0;
     srl.target_system = _gimbal.sysid;
     srl.target_component = _gimbal.compid;
@@ -285,6 +318,7 @@ BootloaderMavlink::err_t BootloaderMavlink::parse_bin_and_send_seq()
     uint32_t offset = 0;
     
     WriteDataState write_state = PASER;
+    
     while (1)
     {
         switch (state_uploadfile)
@@ -302,7 +336,7 @@ BootloaderMavlink::err_t BootloaderMavlink::parse_bin_and_send_seq()
             ftp_rq.burst_complete   = 0;
             ftp_rq.offset           = 0;
 
-            if(!w_ftp_sync(ftp_rq, &ftp_rs))  
+            if(!w_ftp_sync(ftp_rq, ftp_rs))  
             {
                 err ++;
                 break;
@@ -310,11 +344,14 @@ BootloaderMavlink::err_t BootloaderMavlink::parse_bin_and_send_seq()
 
             if (ftp_rs.req_opcode != Opcode::RSP_ACK || ftp_rs.seq_number != ftp_rq.seq_number)
             {
+                printf("Oh, wrong OP CODE %u\n",ftp_rs.req_opcode);
                 err ++;
                 break;
             }
             
             state_uploadfile = WRITE_DATA;
+            printf("write data\n");
+            printf("Total file: %llu\n",total_size);
         }
             break;
         case WRITE_DATA:
@@ -340,12 +377,14 @@ BootloaderMavlink::err_t BootloaderMavlink::parse_bin_and_send_seq()
                 ftp_rq.size = len;
                 offset += len;
                 write_state = SEND;
+                printf("Offset : %lu\n",offset);
+                printf("---------------\n");
             }
             case SEND:
             {
                 ftp_rq.seq_number++;
                 ftp_rq.opcode           = Opcode::CMD_WRITE_FILE;
-                if(!w_ftp_sync(ftp_rq, &ftp_rs))  
+                if(!w_ftp_sync(ftp_rq, ftp_rs))  
                 {
                     err ++;
                     break;
@@ -358,6 +397,7 @@ BootloaderMavlink::err_t BootloaderMavlink::parse_bin_and_send_seq()
                 }
 
                 write_state = PASER;
+                printf("---------------\n");
             }
                 break;
             default:
@@ -366,6 +406,7 @@ BootloaderMavlink::err_t BootloaderMavlink::parse_bin_and_send_seq()
             // Make sure write all the file
             if (offset >= total_size && write_state == PASER)
             {
+                printf("Offset : %lu\n",offset);
                 state_uploadfile = TERMINAL;
                 break;
             }
@@ -376,7 +417,7 @@ BootloaderMavlink::err_t BootloaderMavlink::parse_bin_and_send_seq()
             ftp_rq.seq_number++;
             ftp_rq.opcode           = Opcode::CMD_TERMINATE_SESSION;
             ftp_rq.size             = 0;
-            if(!w_ftp_sync(ftp_rq, &ftp_rs))  
+            if(!w_ftp_sync(ftp_rq, ftp_rs))  
             {
                 err ++;
                 break;
@@ -395,11 +436,11 @@ BootloaderMavlink::err_t BootloaderMavlink::parse_bin_and_send_seq()
             break;
         }
         
-        if (err > 6)
+        if (err > 1)
         {
             return ERR_UNKNOWN;
         }
-        
+        usleep(10000);
     }
     
     return ERR_OK;
@@ -463,14 +504,24 @@ void  BootloaderMavlink::write_thread(void)
             have_message = true;
         }
         pthread_mutex_unlock(&w_mutex);
-
+        if(message.msgid == 0 && have_message){
+            printf("---------------------\n");
+            printf("send heart beat %u \n", time_send_heartbeat_ms - start_time);
+            printf("---------------------\n");
+        }
         if (have_message)
         {
             have_message = false;
             uint16_t len = _serial_port->write_message(message);
+            if(len <= 0)
+            {
+            printf("#################################\n");
+            printf("send heart beat ERRRRRRRRRRRRR \n");
+            printf("#################################\n");
+            }
         }
-        
-        usleep(1000);
+
+        usleep(100);
     }
 }
 bool BootloaderMavlink::is_gimbal(uint8_t compid)

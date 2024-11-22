@@ -2,8 +2,8 @@ project(gSDK)
 
 cmake_minimum_required(VERSION 3.5)
 
-set(CMAKE_CXX_STANDARD 11)
-set(CMAKE_CXX_STANDARD_REQUIRED True)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(MAVLINK_INCLUDES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/mavlink/include/mavlink/v2.0")
