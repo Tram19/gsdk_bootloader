@@ -43,7 +43,6 @@ bool BootloaderMavlink::init()
 {
     if (_serial_port->status != SERIAL_PORT_OPEN)
     {
-        _serial_port->baudrate = 460800;
         _serial_port->open_serial();
     }
     pthread_mutex_init(&w_mutex, NULL);
@@ -131,8 +130,8 @@ bool BootloaderMavlink::run()
             _serial_port->stop();
             _serial_port->baudrate = 460800;
             _serial_port->start();
-            state = WAIT_SETBAUD;
             has_detected = false;
+            state = WAIT_SETBAUD;
         }
             break;
         case WAIT_SETBAUD:
@@ -306,7 +305,7 @@ BootloaderMavlink::err_t BootloaderMavlink::connect_seq()
 BootloaderMavlink::err_t BootloaderMavlink::parse_bin_and_send_seq()
 {
     unsigned int size = 0;
-    uint64_t total_size = binary_size(p_st);
+    uint32_t total_size = binary_size(p_st);
     PayloadHeader ftp_rq = {0};
     PayloadHeader ftp_rs = {0};
     StateUploadFile state_uploadfile = CREATE_FILE;
@@ -330,9 +329,11 @@ BootloaderMavlink::err_t BootloaderMavlink::parse_bin_and_send_seq()
             ftp_rq.session          = 0;
             ftp_rq.opcode           = Opcode::CMD_CREATE_FILE;
             string filename         = fs::path(path).filename() ;
-            ftp_rq.size             = filename.size();
-            size_t lengthToCopy     = (filename.size() > max_data_length - 1) ? max_data_length - 1 : filename.size();
-            memcpy(ftp_rq.data, filename.data(), lengthToCopy);
+            ftp_rq.size             = 4;
+            ftp_rq.data[0] = (total_size >> 24) & 0xFF;
+            ftp_rq.data[1] = (total_size >> 16) & 0xFF;
+            ftp_rq.data[2] = (total_size >> 8) & 0xFF;
+            ftp_rq.data[3] = total_size & 0xFF;
             ftp_rq.burst_complete   = 0;
             ftp_rq.offset           = 0;
 
@@ -480,6 +481,7 @@ void BootloaderMavlink::read_thread(void)
             }
         }
     }
+    usleep(1000);
 }
 
 void  BootloaderMavlink::write_thread(void)
@@ -521,7 +523,7 @@ void  BootloaderMavlink::write_thread(void)
             }
         }
 
-        usleep(100);
+        usleep(1000);
     }
 }
 bool BootloaderMavlink::is_gimbal(uint8_t compid)

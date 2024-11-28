@@ -123,6 +123,7 @@ static void control_sample_gimbal_set_move_rate(Gimbal_Interface &onboard, float
 static void control_sample_gimbal_return_home(Gimbal_Interface &onboard);
 static void control_sample_gimbal_reboot(Gimbal_Interface &onboard);
 
+
 static bool upgrade_firmware(Gimbal_Interface &onboard, Serial_Port &serial_port);
 
 static void monitor_attitude_imu_encoder(Gimbal_Interface &onboard, uint8_t duration);
@@ -475,6 +476,8 @@ static void control_sample_gimbal_process(Gimbal_Interface &onboard, Serial_Port
     printf("\t 13.  Set Gimbal Reboot\n\r");
     printf("\t 14.  Upgrade Firmware\n\r");
     printf("\t 15.  Monitoring Encoder - Attitude - IMU\n\r");
+    printf("\t 16.  Set pitch lock\n\r");
+    printf("\t 17.  Set pitch follow\n\r");
 
     scanf("%d", &number);
 
@@ -615,6 +618,26 @@ static void control_sample_gimbal_process(Gimbal_Interface &onboard, Serial_Port
             uint8_t duration = 0;
             get_input_duration(duration);
             monitor_attitude_imu_encoder(onboard,duration);
+        }
+            break;
+        case 16: // Set pitch lock
+        {
+            if(onboard.set_pitch_mode(false) == Gimbal_Protocol::SUCCESS)
+            {
+                GSDK_DebugSuccess("Set pitch gimbal to LOCK MODE Successfully!\n");
+            }else{
+                GSDK_DebugWarning("Could not set pitch gimbal to LOCK MODE!\n");
+            }
+        }
+            break;
+        case 17: // Set pitch follow
+        {
+            if(onboard.set_pitch_mode(true) == Gimbal_Protocol::SUCCESS)
+            {
+                GSDK_DebugSuccess("Set pitch gimbal to FOLLOW MODE Successfully!\n");
+            }else{
+                GSDK_DebugWarning("Could not set pitch gimbal to FOLLOW MODE!\n");
+            }
         }
             break;
         default:

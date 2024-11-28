@@ -625,6 +625,14 @@ public:
      */
     uint32_t get_gimbal_attitude_flag(void);
 
+    /**
+     * @brief Set pitch follow/lock
+     * @param bool is follow mode
+     * 
+     * @return Gimbal_Protocol::result_t 
+     */
+    Gimbal_Protocol::result_t set_pitch_mode(bool is_follow);
+
 private:
 
     /**
@@ -763,6 +771,7 @@ private:
 
         GMB_PARAM_RC_TYPE,
 
+        GMD_PARAM_PITCH_FOLLOW,
         GIMBAL_NUM_TRACKED_PARAMS
     };
     
@@ -933,6 +942,8 @@ private:
         {48, "RC_LIM_MAX_PAN", 0, PARAM_STATE_NOT_YET_READ, 0, false},
 
         {21, "RC_TYPE", 0, PARAM_STATE_NOT_YET_READ, 0, false},
+
+        {11, "FLW_SP_TILT", 0, PARAM_STATE_NOT_YET_READ, 0, false},
     };
 
     uint64_t _last_request_ms;

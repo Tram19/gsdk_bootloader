@@ -1317,6 +1317,11 @@ uint32_t Gimbal_Interface::get_gimbal_attitude_flag(void)
     return attitude_flags;
 }
 
+Gimbal_Protocol::result_t Gimbal_Interface::set_pitch_mode(bool is_follow)
+{
+    return set_param(GMD_PARAM_PITCH_FOLLOW, is_follow);
+}
+
 /**
  * @brief  This function get gimbal encoder depends on encoder type send
  * @param: None
