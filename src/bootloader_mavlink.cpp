@@ -383,7 +383,6 @@ BootloaderMavlink::err_t BootloaderMavlink::parse_bin_and_send_seq()
             }
             case SEND:
             {
-                ftp_rq.seq_number++;
                 ftp_rq.opcode           = Opcode::CMD_WRITE_FILE;
                 if(!w_ftp_sync(ftp_rq, ftp_rs))  
                 {
@@ -396,7 +395,7 @@ BootloaderMavlink::err_t BootloaderMavlink::parse_bin_and_send_seq()
                     err ++;
                     break;
                 }
-
+                ftp_rq.seq_number++;
                 write_state = PASER;
                 printf("---------------\n");
             }
