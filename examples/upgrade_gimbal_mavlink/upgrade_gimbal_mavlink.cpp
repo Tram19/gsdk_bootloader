@@ -82,7 +82,7 @@ int main(int argc, char **argv)
     int baudrate = 115200;
     string path = "/home/ntdat/User/gSDK/gSDK_Gitlab/gSDK/FW/PixyC_V.bin";
     // do the parse, will throw an int if it fails
-    // parse_commandline(argc, argv, uart_name, baudrate, path);
+    parse_commandline(argc, argv, uart_name, baudrate, path);
     int time = 0;
     int s = 0 , f = 0;
 

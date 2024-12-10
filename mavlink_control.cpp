@@ -1573,6 +1573,7 @@ static void monitor_attitude_imu_encoder(Gimbal_Interface &onboard,  uint8_t dur
         if (elapsed.count() >= duration) {
             break;
         }
+        
         my_imu =  onboard.get_gimbal_raw_imu();
         GSDK_DebugInfo("\n\nRaw imu:  xacc:%d, yacc:%d, zacc:%d, xgyro:%d, xgyro:%d, xgyro:%d(raw)\n",
                                                         my_imu.accel.x,
@@ -1581,9 +1582,11 @@ static void monitor_attitude_imu_encoder(Gimbal_Interface &onboard,  uint8_t dur
                                                         my_imu.gyro.x,
                                                         my_imu.gyro.y,
                                                         my_imu.gyro.z);
+
         myattitude= onboard.get_gimbal_attitude();
 
         GSDK_DebugInfo("Gimbal attitude Pitch - Roll - Yaw: (%.2f) - (%.2f) - (%.2f)\n" ,myattitude.pitch, myattitude.roll, myattitude.yaw);
+
         myencoder = onboard.get_gimbal_encoder();
 
         GSDK_DebugInfo("Gimbal encoder Pitch - Roll - Yaw: (%d) - (%d) - (%d)\n" ,myencoder.pitch, myencoder.roll, myencoder.yaw);

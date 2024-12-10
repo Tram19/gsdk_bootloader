@@ -228,6 +228,7 @@ bool  BootloaderMavlink::w_ftp_sync(const PayloadHeader &ftp_send, PayloadHeader
 {
     mavlink_message_t message = { 0 };
     const uint8_t * data = reinterpret_cast<const uint8_t*>(&ftp_send);
+    printf("Send data -----------------------\n");
     printf("seq_number : %u\n",ftp_send.seq_number);
     printf("session : %u\n",ftp_send.session);
     printf("OP code : %u\n",ftp_send.opcode);
@@ -257,14 +258,14 @@ bool  BootloaderMavlink::w_ftp_sync(const PayloadHeader &ftp_send, PayloadHeader
         {
             result = true;
             memcpy((&ftp_receive) , &_messages.ftp.payload[0] , sizeof(PayloadHeader));
-
+                printf("receive data -----------------------\n");
                 printf("Payload[0] : %u\n",_messages.ftp.payload[0]);
                 printf("Payload[1] : %u\n",_messages.ftp.payload[1]);
                 printf("Payload[2] : %u\n",_messages.ftp.payload[2]);
                 printf("Payload[5] : %u\n",_messages.ftp.payload[5]);
                 printf("seq_number : %u\n",ftp_receive.seq_number);
                 printf("session : %u\n",ftp_receive.session);
-                printf("OP code : %u\n",ftp_receive.req_opcode);
+                printf("OP code : %u\n",ftp_receive.opcode);
         }else
         {
             printf("Wrong ID\n");
@@ -324,8 +325,6 @@ BootloaderMavlink::err_t BootloaderMavlink::parse_bin_and_send_seq()
         {
         case CREATE_FILE:
         {
-
-            ftp_rq.seq_number++;
             ftp_rq.session          = 0;
             ftp_rq.opcode           = Opcode::CMD_CREATE_FILE;
             string filename         = fs::path(path).filename() ;
@@ -343,13 +342,13 @@ BootloaderMavlink::err_t BootloaderMavlink::parse_bin_and_send_seq()
                 break;
             }
 
-            if (ftp_rs.req_opcode != Opcode::RSP_ACK || ftp_rs.seq_number != ftp_rq.seq_number)
+            if (ftp_rs.opcode != Opcode::RSP_ACK || ftp_rs.seq_number != ftp_rq.seq_number)
             {
-                printf("Oh, wrong OP CODE %u\n",ftp_rs.req_opcode);
+                printf("Oh, wrong OP CODE %u - req opcode : %u\n",ftp_rs.req_opcode,ftp_rs.req_opcode);
                 err ++;
                 break;
             }
-            
+            ftp_rq.seq_number++;
             state_uploadfile = WRITE_DATA;
             printf("write data\n");
             printf("Total file: %llu\n",total_size);
@@ -384,13 +383,14 @@ BootloaderMavlink::err_t BootloaderMavlink::parse_bin_and_send_seq()
             case SEND:
             {
                 ftp_rq.opcode           = Opcode::CMD_WRITE_FILE;
+                ftp_rq.offset =         offset;
                 if(!w_ftp_sync(ftp_rq, ftp_rs))  
                 {
                     err ++;
                     break;
                 }
 
-                if (ftp_rs.req_opcode != Opcode::RSP_ACK || ftp_rs.seq_number != ftp_rq.seq_number)
+                if (ftp_rs.opcode != Opcode::RSP_ACK || ftp_rs.seq_number != ftp_rq.seq_number)
                 {
                     err ++;
                     break;
@@ -414,7 +414,7 @@ BootloaderMavlink::err_t BootloaderMavlink::parse_bin_and_send_seq()
             break;
         case TERMINAL:
         {
-            ftp_rq.seq_number++;
+            
             ftp_rq.opcode           = Opcode::CMD_TERMINATE_SESSION;
             ftp_rq.size             = 0;
             if(!w_ftp_sync(ftp_rq, ftp_rs))  
@@ -428,7 +428,7 @@ BootloaderMavlink::err_t BootloaderMavlink::parse_bin_and_send_seq()
                 err ++;
                 break;
             }
-
+            ftp_rq.seq_number++;
             return ERR_OK;
         }
             break;
@@ -552,6 +552,7 @@ void BootloaderMavlink::messages_handler(const mavlink_message_t &message)
         {
         case MAVLINK_MSG_ID_HEARTBEAT: 
         {
+            printf("\n\nGot heart beat!\n\n");
             pthread_mutex_lock(&_messages.mutex);
             mavlink_msg_heartbeat_decode(&message, &_messages.heartbeat);
             if (!has_detected)

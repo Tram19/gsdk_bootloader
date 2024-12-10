@@ -202,7 +202,8 @@ void Gimbal_Interface::messages_handler(const mavlink_message_t &message)
                     pthread_mutex_lock(&_messages.mutex);
                     mavlink_msg_gimbal_device_attitude_status_decode(&message, &_messages.atttitude_status);
                     _messages.timestamps.attitude_status = get_time_usec();
-
+                    // printf(" TS: %u\n",_messages.atttitude_status.target_system);
+                    // printf(" TC: %u\n",_messages.atttitude_status.target_component);
                     if (_gimbal_proto != nullptr) {
                         _gimbal_proto->update_attitude(_messages.atttitude_status.q);
                     }
@@ -1925,7 +1926,7 @@ void Gimbal_Interface::read_thread(void)
                 for (int i = 0; i < result; ++i) {
                     // the parsing
                     if (mavlink_parse_char(_channel, (uint8_t)buf[i], &message, &mav_status)) {
-                        // printf("Parse error: %u, Drop: %u, Success: %u\n",mav_status.parse_error,mav_status.packet_rx_drop_count,mav_status.packet_rx_success_count);
+                        printf("Parse error: %u, Drop: %u, Success: %u\n",mav_status.parse_error,mav_status.packet_rx_drop_count,mav_status.packet_rx_success_count);
                         messages_handler(message);
                     }
                 }

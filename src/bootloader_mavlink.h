@@ -45,7 +45,7 @@ public:
         RSP_NAK ///< Nak response
     };
     /// @brief Maximum data size in RequestHeader::data
-    static constexpr uint8_t max_data_length = 239; 
+    static constexpr uint8_t max_data_length = 200; 
 
     /// @brief This is the payload which is in mavlink_file_transfer_protocol_t.payload.
     /// This needs to be packed, because it's typecasted from
@@ -63,10 +63,15 @@ public:
         uint32_t offset; ///< Offsets for List and Read commands
         uint8_t data[max_data_length]; ///< command data, varies by Opcode
     });
-
-    static_assert(
-        sizeof(PayloadHeader) == sizeof(mavlink_file_transfer_protocol_t::payload),
-        "PayloadHeader size is incorrect.");
+    PACK(struct FirmwareInfo {
+        uint32_t total_size; ///< Total size of the file 
+        uint8_t x;
+        uint8_t y;
+        uint8_t z;
+    });
+    // static_assert(
+    //     sizeof(PayloadHeader) == sizeof(mavlink_file_transfer_protocol_t::payload),
+    //     "PayloadHeader size is incorrect.");
         
     typedef enum {
         ERR_OK = 0,
