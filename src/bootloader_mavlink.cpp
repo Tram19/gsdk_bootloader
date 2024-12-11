@@ -286,7 +286,7 @@ BootloaderMavlink::err_t BootloaderMavlink::connect_seq()
     srl.device = SERIAL_CONTROL_SERIAL0;
     srl.flags = SERIAL_CONTROL_FLAG_RESPOND;
     srl.timeout = 1000; // timeout 1s
-    srl.baudrate = 460800;
+    srl.baudrate = 115200;
     srl.count = 0;
     srl.target_system = _gimbal.sysid;
     srl.target_component = _gimbal.compid;
@@ -298,7 +298,7 @@ BootloaderMavlink::err_t BootloaderMavlink::connect_seq()
     if (srl_receive.target_component != _system.compid && srl_receive.target_system != _system.sysid &&
         srl_receive.device == SERIAL_CONTROL_SERIAL0 && srl_receive.flags == SERIAL_CONTROL_FLAG_REPLY)  return ERR_UNKNOWN;
     
-    if (srl_receive.baudrate != srl.baudrate) return ERR_SKIP;
+    if (srl_receive.baudrate != srl.baudrate || srl_receive.baudrate == _serial_port->baudrate) return ERR_SKIP;
 
     return ERR_OK;
 }
