@@ -375,7 +375,6 @@ BootloaderMavlink::err_t BootloaderMavlink::parse_bin_and_send_seq()
                     break;
                 }
                 ftp_rq.size = len;
-                offset += len;
                 write_state = SEND;
                 printf("Offset : %lu\n",offset);
                 printf("---------------\n");
@@ -395,6 +394,7 @@ BootloaderMavlink::err_t BootloaderMavlink::parse_bin_and_send_seq()
                     err ++;
                     break;
                 }
+                offset += ftp_rq.size;
                 ftp_rq.seq_number++;
                 write_state = PASER;
                 printf("---------------\n");
