@@ -87,16 +87,35 @@ bool BootloaderMavlink::run()
         return false;
     }
     uint8_t total_e = 0;
-    
+    usleep(2000000); //wait gimbal reboot.
+
+    while (total_e < 10)
+    {
+
+        if(reboot_seq() != ERR_OK)
+        {
+            total_e++;
+            usleep(2000000);//wait gimbal reboot.
+        }else
+        {
+            break;
+        }
+        
+    }
+    if (total_e >= 5)
+    {
+        return false;
+    }
+    total_e = 0;
     while (1)
     {
         uint64_t time  = lastest_timeslap_heartbeat();
-        if (time > 10000)
+        if (time > 20000)
         {
             printf("Cannot communicate!\n");
             return false;
         }
-        else if((time < 10000 && time > 3000) || !has_detected)
+        else if((time < 20000 && time > 3000) || !has_detected)
         {
             continue;
         }
@@ -280,7 +299,60 @@ bool  BootloaderMavlink::w_ftp_sync(const PayloadHeader &ftp_send, PayloadHeader
     pthread_mutex_unlock(&_messages.mutex_ftp);
     return result;
 }
+bool  BootloaderMavlink::w_reboot_sync(const mavlink_command_long_t &cmdlong, mavlink_command_ack_t &cmdack)
+{
+    mavlink_message_t message = { 0 };
+    mavlink_msg_command_long_encode_chan(
+                                    _system.sysid, 
+                                    _system.compid, 
+                                    _channel,
+                                    &message,
+                                    &cmdlong
+                                    );
+    struct timespec time_wait;
+    int rt = 0;
+    bool result = false;
+    clock_gettime(CLOCK_REALTIME, &time_wait);
+    // Wait for 1 sec timeout
+    time_wait.tv_sec += 1;
+    w_message(message);
+    pthread_mutex_lock(&_messages.mutex_cmd_ack);
+    rt = pthread_cond_timedwait(&_messages._condition_cmd_ack, &_messages.mutex_cmd_ack, &time_wait);
+    if (rt != ETIMEDOUT) {
+        if (_messages.cmd_ack.target_component == _system.compid && _messages.cmd_ack.target_system == _system.sysid && _messages.cmd_ack.command == cmdlong.command)
+        {
+            result = true;
+            memcpy(&cmdack,&_messages.cmd_ack,sizeof( mavlink_command_ack_t));
+        }
+    }else
+    {
+        printf("Timeout reboot!\n\n");
+    }
+    
+    pthread_mutex_unlock(&_messages.mutex_cmd_ack);
+    return result;
+}
+BootloaderMavlink::err_t BootloaderMavlink::reboot_seq()
+{
+    mavlink_command_long_t cmd_long{0};
+    mavlink_command_ack_t  cmd_ack{0};
+    cmd_long.command = MAV_CMD_PREFLIGHT_REBOOT_SHUTDOWN;
+    cmd_long.param4  = 1;
+    cmd_long.target_component = expect_compid;
+    cmd_long.target_system = 1;
+    if(!w_reboot_sync(cmd_long, cmd_ack))
+    {
+        return ERR_TIMEOUT;
+    } 
 
+    if (cmd_ack.result != 0)
+    {
+        printf("Reboot NACK: %u\n",cmd_ack.result);
+        return ERR_NACK;
+    }
+    printf("Reboot OK\n");
+    return ERR_OK;
+}
 BootloaderMavlink::err_t BootloaderMavlink::connect_seq()
 {
     mavlink_serial_control_t srl;
@@ -507,11 +579,6 @@ void  BootloaderMavlink::write_thread(void)
             have_message = true;
         }
         pthread_mutex_unlock(&w_mutex);
-        if(message.msgid == 0 && have_message){
-            printf("---------------------\n");
-            printf("send heart beat %u \n", time_send_heartbeat_ms - start_time);
-            printf("---------------------\n");
-        }
         if (have_message)
         {
             have_message = false;
@@ -557,7 +624,7 @@ void BootloaderMavlink::messages_handler(const mavlink_message_t &message)
             printf("\n\nGot heart beat! %u\n\n",message.compid);
             pthread_mutex_lock(&_messages.mutex);
             mavlink_msg_heartbeat_decode(&message, &_messages.heartbeat);
-            if (!has_detected && message.compid == 193)
+            if (!has_detected && message.compid == expect_compid)
             {
                 // Store message sysid and compid.
                 _gimbal.sysid  = message.sysid;
@@ -584,6 +651,16 @@ void BootloaderMavlink::messages_handler(const mavlink_message_t &message)
             mavlink_msg_serial_control_decode(&message, &_messages.sr_ctl);
             pthread_cond_signal(&_messages._condition_srl);
             pthread_mutex_unlock(&_messages.mutex_srl);
+        }
+        break;
+        case MAVLINK_MSG_ID_COMMAND_ACK:
+        {
+            printf("GOTTTTTT CMD ACK\n");
+            printf("Sys id: %u - Comp id: %u\n",message.msgid,message.compid);
+            pthread_mutex_lock(&_messages.mutex_cmd_ack);
+            mavlink_msg_command_ack_decode(&message, &_messages.cmd_ack);
+            pthread_cond_signal(&_messages._condition_cmd_ack);
+            pthread_mutex_unlock(&_messages.mutex_cmd_ack);
         }
         break;
         default:

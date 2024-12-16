@@ -93,6 +93,8 @@ public:
     void start_write_thread(void);
     bool is_gimbal(uint8_t compid);
 
+
+    uint8_t expect_compid{MAV_COMP_ID_USER75};
 private:
     enum State : uint8_t{
         CONNECT,
@@ -116,9 +118,11 @@ private:
         pthread_mutex_t     mutex;
         pthread_mutex_t     mutex_ftp;
         pthread_mutex_t     mutex_srl;
+        pthread_mutex_t     mutex_cmd_ack;
 
         pthread_cond_t      _condition_srl;
         pthread_cond_t      _condition_ftp;
+        pthread_cond_t      _condition_cmd_ack;
         // Heartbeat
         mavlink_heartbeat_t heartbeat        = { 0 };
 
@@ -126,14 +130,16 @@ private:
 
         mavlink_serial_control_t sr_ctl      = { 0 }; 
 
-
+        mavlink_command_ack_t   cmd_ack = { 0 };
         messages_t()
         {
             pthread_mutex_init(&mutex, NULL);
             pthread_mutex_init(&mutex_srl, NULL);
             pthread_mutex_init(&mutex_ftp, NULL);
+            pthread_mutex_init(&mutex_cmd_ack, NULL);
             pthread_cond_init(&_condition_srl, NULL);
             pthread_cond_init(&_condition_ftp, NULL);
+            pthread_cond_init(&_condition_cmd_ack, NULL);
         }
 
         ~messages_t()
@@ -141,8 +147,10 @@ private:
             pthread_mutex_destroy(&mutex);
             pthread_mutex_destroy(&mutex_srl);
             pthread_mutex_destroy(&mutex_ftp);
+            pthread_mutex_destroy(&mutex_cmd_ack);
             pthread_cond_destroy(&_condition_srl);
             pthread_cond_destroy(&_condition_ftp);
+            pthread_cond_destroy(&_condition_cmd_ack);
         }
 
     };
@@ -169,12 +177,14 @@ private:
 
     bool  w_serial_control_sync(const mavlink_serial_control_t &srl_send, mavlink_serial_control_t &srl_receive);
     bool  w_ftp_sync(const PayloadHeader &ftp_send, PayloadHeader &ftp_receive);
+    bool  w_reboot_sync(const mavlink_command_long_t &cmdlong, mavlink_command_ack_t &cmdack);
 
     void  w_heartbeat();
     bool  w_message(const mavlink_message_t &message);
 
     err_t parse_bin_and_send_seq();
     err_t connect_seq();
+    err_t reboot_seq();
     uint64_t  lastest_timeslap_heartbeat();
 
 };
