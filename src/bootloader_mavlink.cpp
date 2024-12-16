@@ -119,8 +119,9 @@ bool BootloaderMavlink::run()
             else
             {
                 printf("Connect err\n");
-                state = SETBAUD;
+                // state = TRANSMIT;
                 total_e++;
+                // return false;
             }
             
         }
@@ -211,7 +212,7 @@ bool  BootloaderMavlink::w_serial_control_sync(const mavlink_serial_control_t &s
     bool result = false;
     clock_gettime(CLOCK_REALTIME, &time_wait);
 // Wait for 1 sec timeout
-    time_wait.tv_sec += 1;
+    time_wait.tv_sec += 3;
     w_message(message);
     pthread_mutex_lock(&_messages.mutex_srl);
     rt = pthread_cond_timedwait(&_messages._condition_srl, &_messages.mutex_srl, &time_wait);
@@ -249,7 +250,7 @@ bool  BootloaderMavlink::w_ftp_sync(const PayloadHeader &ftp_send, PayloadHeader
     bool result = false;
     clock_gettime(CLOCK_REALTIME, &time_wait);
     // Wait for 1 sec timeout
-    time_wait.tv_sec += 1;
+    time_wait.tv_sec += 100;
     w_message(message);
     pthread_mutex_lock(&_messages.mutex_ftp);
     rt = pthread_cond_timedwait(&_messages._condition_ftp, &_messages.mutex_ftp, &time_wait);
@@ -290,14 +291,16 @@ BootloaderMavlink::err_t BootloaderMavlink::connect_seq()
     srl.count = 0;
     srl.target_system = _gimbal.sysid;
     srl.target_component = _gimbal.compid;
-
-    mavlink_serial_control_t srl_receive;
+    mavlink_serial_control_t srl_receive{0};
+    printf("get baud1: %u\n",srl_receive.baudrate);
+    
 
     if(!w_serial_control_sync(srl, srl_receive)) return ERR_TIMEOUT;
 
     if (srl_receive.target_component != _system.compid && srl_receive.target_system != _system.sysid &&
         srl_receive.device == SERIAL_CONTROL_SERIAL0 && srl_receive.flags == SERIAL_CONTROL_FLAG_REPLY)  return ERR_UNKNOWN;
     
+    printf("get baud2: %u\n",srl_receive.baudrate);
     if (srl_receive.baudrate != srl.baudrate || srl_receive.baudrate == _serial_port->baudrate) return ERR_SKIP;
 
     return ERR_OK;
@@ -328,11 +331,10 @@ BootloaderMavlink::err_t BootloaderMavlink::parse_bin_and_send_seq()
             ftp_rq.session          = 0;
             ftp_rq.opcode           = Opcode::CMD_CREATE_FILE;
             string filename         = fs::path(path).filename() ;
-            ftp_rq.size             = 4;
-            ftp_rq.data[0] = (total_size >> 24) & 0xFF;
-            ftp_rq.data[1] = (total_size >> 16) & 0xFF;
-            ftp_rq.data[2] = (total_size >> 8) & 0xFF;
-            ftp_rq.data[3] = total_size & 0xFF;
+            ftp_rq.size             = sizeof(FirmwareInfo);
+            FirmwareInfo            fw_info{0};
+            fw_info.total_size = total_size;
+            memcpy(&ftp_rq.data[0],&fw_info,sizeof(FirmwareInfo));
             ftp_rq.burst_complete   = 0;
             ftp_rq.offset           = 0;
 
@@ -546,16 +548,16 @@ bool BootloaderMavlink::is_gimbal(uint8_t compid)
 }
 void BootloaderMavlink::messages_handler(const mavlink_message_t &message)
 {
-    if (is_gimbal(message.compid))
+    // if (is_gimbal(message.compid))
     {
         switch (message.msgid)
         {
         case MAVLINK_MSG_ID_HEARTBEAT: 
         {
-            printf("\n\nGot heart beat!\n\n");
+            printf("\n\nGot heart beat! %u\n\n",message.compid);
             pthread_mutex_lock(&_messages.mutex);
             mavlink_msg_heartbeat_decode(&message, &_messages.heartbeat);
-            if (!has_detected)
+            if (!has_detected && message.compid == 193)
             {
                 // Store message sysid and compid.
                 _gimbal.sysid  = message.sysid;
@@ -568,6 +570,7 @@ void BootloaderMavlink::messages_handler(const mavlink_message_t &message)
         break;
         case MAVLINK_MSG_ID_FILE_TRANSFER_PROTOCOL:
         {
+            printf("GOTTTTTT FILE_TRANSFER_PROTOCOL\n");
             pthread_mutex_lock(&_messages.mutex_ftp);
             mavlink_msg_file_transfer_protocol_decode(&message, &_messages.ftp);
             pthread_cond_signal(&_messages._condition_ftp);
@@ -576,6 +579,7 @@ void BootloaderMavlink::messages_handler(const mavlink_message_t &message)
         break;
         case MAVLINK_MSG_ID_SERIAL_CONTROL:
         {
+            printf("GOTTTTTT SERIAL_CONTROL\n");
             pthread_mutex_lock(&_messages.mutex_srl);
             mavlink_msg_serial_control_decode(&message, &_messages.sr_ctl);
             pthread_cond_signal(&_messages._condition_srl);

@@ -45,7 +45,7 @@ public:
         RSP_NAK ///< Nak response
     };
     /// @brief Maximum data size in RequestHeader::data
-    static constexpr uint8_t max_data_length = 200; 
+    static constexpr uint8_t max_data_length = 128; 
 
     /// @brief This is the payload which is in mavlink_file_transfer_protocol_t.payload.
     /// This needs to be packed, because it's typecasted from

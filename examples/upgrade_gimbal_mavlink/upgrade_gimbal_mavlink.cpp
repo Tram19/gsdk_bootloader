@@ -80,7 +80,7 @@ int main(int argc, char **argv)
     char *uart_name = (char *)"/dev/ttyUSB0";
     #endif
     int baudrate = 115200;
-    string path = "/home/ntdat/User/gSDK/gSDK_Gitlab/gSDK/FW/PixyC_V.bin";
+    string path = "/home/ntdat/User/gSDK/gSDK_Gitlab/gSDK/FW/STM_Router_192.bin";
     // do the parse, will throw an int if it fails
     parse_commandline(argc, argv, uart_name, baudrate, path);
     int time = 0;
