@@ -81,7 +81,7 @@ public:
         ERR_SKIP,	/* Skip this state */
     }err_t;
 
-    BootloaderMavlink(Serial_Port *serial_port , string path);
+    BootloaderMavlink(Serial_Port *serial_port , string path, uint8_t expect_compid);
     BootloaderMavlink() = delete;
     ~BootloaderMavlink();
 
@@ -93,8 +93,6 @@ public:
     void start_write_thread(void);
     bool is_gimbal(uint8_t compid);
 
-
-    uint8_t expect_compid{MAV_COMP_ID_USER75};
 private:
     enum State : uint8_t{
         CONNECT,
@@ -171,6 +169,8 @@ private:
     mavlink_system_t    _system{1,MAV_COMP_ID_ONBOARD_COMPUTER};
     mavlink_system_t    _gimbal{};
     uint64_t            timeslap_hb {0};
+    uint8_t expect_compid{0};
+
     void  read_thread(void);
     void  write_thread(void);
     void  messages_handler(const mavlink_message_t &message);

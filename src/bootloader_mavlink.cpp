@@ -25,10 +25,11 @@ static void *start_bootloader_read_thread(void *args);
 
 static void *start_bootloader_write_thread(void *args);
 
-BootloaderMavlink::BootloaderMavlink(Serial_Port *serial_port , string path)
+BootloaderMavlink::BootloaderMavlink(Serial_Port *serial_port , string path, uint8_t expect_compid)
 {
     this -> path = path;
     this -> _serial_port = serial_port;
+    this -> expect_compid = expect_compid;
 }
 
 BootloaderMavlink::~BootloaderMavlink()
@@ -87,7 +88,6 @@ bool BootloaderMavlink::run()
         return false;
     }
     uint8_t total_e = 0;
-    usleep(2000000); //wait gimbal reboot.
 
     while (total_e < 10)
     {
@@ -95,7 +95,7 @@ bool BootloaderMavlink::run()
         if(reboot_seq() != ERR_OK)
         {
             total_e++;
-            usleep(2000000);//wait gimbal reboot.
+            usleep(2000000);//wait 2 seconds gimbal reboot.
         }else
         {
             break;
@@ -248,13 +248,13 @@ bool  BootloaderMavlink::w_ftp_sync(const PayloadHeader &ftp_send, PayloadHeader
 {
     mavlink_message_t message = { 0 };
     const uint8_t * data = reinterpret_cast<const uint8_t*>(&ftp_send);
-    printf("Send data -----------------------\n");
-    printf("seq_number : %u\n",ftp_send.seq_number);
-    printf("session : %u\n",ftp_send.session);
-    printf("OP code : %u\n",ftp_send.opcode);
-    printf("Data[0] : %u\n",data[0]);
-    printf("Data[1] : %u\n",data[1]);
-    printf("Data[2] : %u\n",data[2]);
+    // printf("Send data -----------------------\n");
+    // printf("seq_number : %u\n",ftp_send.seq_number);
+    // printf("session : %u\n",ftp_send.session);
+    // printf("OP code : %u\n",ftp_send.opcode);
+    // printf("Data[0] : %u\n",data[0]);
+    // printf("Data[1] : %u\n",data[1]);
+    // printf("Data[2] : %u\n",data[2]);
     mavlink_msg_file_transfer_protocol_pack_chan(
                                                 _system.sysid, 
                                                 _system.compid, 
@@ -269,7 +269,7 @@ bool  BootloaderMavlink::w_ftp_sync(const PayloadHeader &ftp_send, PayloadHeader
     bool result = false;
     clock_gettime(CLOCK_REALTIME, &time_wait);
     // Wait for 1 sec timeout
-    time_wait.tv_sec += 100;
+    time_wait.tv_sec += 5;
     w_message(message);
     pthread_mutex_lock(&_messages.mutex_ftp);
     rt = pthread_cond_timedwait(&_messages._condition_ftp, &_messages.mutex_ftp, &time_wait);
@@ -350,7 +350,6 @@ BootloaderMavlink::err_t BootloaderMavlink::reboot_seq()
         printf("Reboot NACK: %u\n",cmd_ack.result);
         return ERR_NACK;
     }
-    printf("Reboot OK\n");
     return ERR_OK;
 }
 BootloaderMavlink::err_t BootloaderMavlink::connect_seq()
@@ -497,12 +496,13 @@ BootloaderMavlink::err_t BootloaderMavlink::parse_bin_and_send_seq()
                 break;
             }
 
-            if (ftp_rs.req_opcode != Opcode::RSP_ACK || ftp_rs.seq_number != ftp_rq.seq_number)
+            if (ftp_rs.opcode != Opcode::RSP_ACK || ftp_rs.seq_number != ftp_rq.seq_number)
             {
                 err ++;
                 break;
             }
             ftp_rq.seq_number++;
+            printf("Flash FW Success!\n");
             return ERR_OK;
         }
             break;
@@ -621,7 +621,6 @@ void BootloaderMavlink::messages_handler(const mavlink_message_t &message)
         {
         case MAVLINK_MSG_ID_HEARTBEAT: 
         {
-            printf("\n\nGot heart beat! %u\n\n",message.compid);
             pthread_mutex_lock(&_messages.mutex);
             mavlink_msg_heartbeat_decode(&message, &_messages.heartbeat);
             if (!has_detected && message.compid == expect_compid)
@@ -637,7 +636,7 @@ void BootloaderMavlink::messages_handler(const mavlink_message_t &message)
         break;
         case MAVLINK_MSG_ID_FILE_TRANSFER_PROTOCOL:
         {
-            printf("GOTTTTTT FILE_TRANSFER_PROTOCOL\n");
+
             pthread_mutex_lock(&_messages.mutex_ftp);
             mavlink_msg_file_transfer_protocol_decode(&message, &_messages.ftp);
             pthread_cond_signal(&_messages._condition_ftp);
@@ -646,7 +645,7 @@ void BootloaderMavlink::messages_handler(const mavlink_message_t &message)
         break;
         case MAVLINK_MSG_ID_SERIAL_CONTROL:
         {
-            printf("GOTTTTTT SERIAL_CONTROL\n");
+
             pthread_mutex_lock(&_messages.mutex_srl);
             mavlink_msg_serial_control_decode(&message, &_messages.sr_ctl);
             pthread_cond_signal(&_messages._condition_srl);
@@ -655,8 +654,7 @@ void BootloaderMavlink::messages_handler(const mavlink_message_t &message)
         break;
         case MAVLINK_MSG_ID_COMMAND_ACK:
         {
-            printf("GOTTTTTT CMD ACK\n");
-            printf("Sys id: %u - Comp id: %u\n",message.msgid,message.compid);
+
             pthread_mutex_lock(&_messages.mutex_cmd_ack);
             mavlink_msg_command_ack_decode(&message, &_messages.cmd_ack);
             pthread_cond_signal(&_messages._condition_cmd_ack);

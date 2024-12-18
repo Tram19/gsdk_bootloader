@@ -88,7 +88,7 @@ int main(int argc, char **argv)
 
 
     Serial_Port serial_port(uart_name, baudrate);
-    BootloaderMavlink boot_loader(&serial_port, path);
+    BootloaderMavlink boot_loader(&serial_port, path, MAV_COMP_ID_USER75);
 
     //FLASH CODE
     boot_loader.init();
