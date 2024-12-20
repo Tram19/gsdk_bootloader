@@ -12,7 +12,7 @@
 void parse_commandline(int argc, char **argv, char *&uart_name, int &baudrate, string &path, uint8_t &expect_compid)
 {
     // string for command line usage
-    const char *commandline_usage = "usage: mavlink_serial -d <devicename> -b <baudrate> -p <path>";
+    const char *commandline_usage = "usage:  upgrade_gimbal_mavlink -d <devicename> -b <baudrate> -p <path> -c <expect_compid>";
 
     // Read input arguments
     for (int i = 1; i < argc; i++) { // argv[0] is "mavlink"
