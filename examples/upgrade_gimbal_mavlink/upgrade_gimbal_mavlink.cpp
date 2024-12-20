@@ -9,7 +9,7 @@
 //   Parse Command Line
 // ------------------------------------------------------------------------------
 // throws EXIT_FAILURE if could not open the port
-void parse_commandline(int argc, char **argv, char *&uart_name, int &baudrate, string &path)
+void parse_commandline(int argc, char **argv, char *&uart_name, int &baudrate, string &path, uint8_t &expect_compid)
 {
     // string for command line usage
     const char *commandline_usage = "usage: mavlink_serial -d <devicename> -b <baudrate> -p <path>";
@@ -55,6 +55,17 @@ void parse_commandline(int argc, char **argv, char *&uart_name, int &baudrate, s
                 throw EXIT_FAILURE;
             }
         }
+
+        // Expect compid
+        if (strcmp(argv[i], "-c") == 0 || strcmp(argv[i], "--compid") == 0) {
+            if (argc > i + 1) {
+                expect_compid = atoi(argv[i + 1]);
+
+            } else {
+                printf("%s\n", commandline_usage);
+                throw EXIT_FAILURE;
+            }
+        }
     }
 
     if (path == "")
@@ -79,16 +90,17 @@ int main(int argc, char **argv)
     #else
     char *uart_name = (char *)"/dev/ttyUSB0";
     #endif
+    uint8_t expect_compid = 154;
     int baudrate = 115200;
     string path = "/home/ntdat/User/gSDK/gSDK_Gitlab/gSDK/FW/STM_Router_192.bin";
     // do the parse, will throw an int if it fails
-    parse_commandline(argc, argv, uart_name, baudrate, path);
+    parse_commandline(argc, argv, uart_name, baudrate, path, expect_compid);
     int time = 0;
     int s = 0 , f = 0;
 
 
     Serial_Port serial_port(uart_name, baudrate);
-    BootloaderMavlink boot_loader(&serial_port, path, 154);
+    BootloaderMavlink boot_loader(&serial_port, path, expect_compid);
 
     //FLASH CODE
     boot_loader.init();

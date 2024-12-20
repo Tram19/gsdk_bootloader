@@ -626,7 +626,6 @@ void BootloaderMavlink::messages_handler(const mavlink_message_t &message)
         {
         case MAVLINK_MSG_ID_HEARTBEAT: 
         {
-            printf("Get heartbeat\n");
             pthread_mutex_lock(&_messages.mutex);
             mavlink_msg_heartbeat_decode(&message, &_messages.heartbeat);
             if (!has_detected && message.compid == expect_compid)
@@ -642,7 +641,6 @@ void BootloaderMavlink::messages_handler(const mavlink_message_t &message)
         break;
         case MAVLINK_MSG_ID_FILE_TRANSFER_PROTOCOL:
         {
-            printf("Get FTP\n");
             pthread_mutex_lock(&_messages.mutex_ftp);
             mavlink_msg_file_transfer_protocol_decode(&message, &_messages.ftp);
             pthread_cond_signal(&_messages._condition_ftp);
@@ -651,7 +649,6 @@ void BootloaderMavlink::messages_handler(const mavlink_message_t &message)
         break;
         case MAVLINK_MSG_ID_SERIAL_CONTROL:
         {
-            printf("Get SRL\n");
             pthread_mutex_lock(&_messages.mutex_srl);
             mavlink_msg_serial_control_decode(&message, &_messages.sr_ctl);
             pthread_cond_signal(&_messages._condition_srl);
@@ -660,7 +657,6 @@ void BootloaderMavlink::messages_handler(const mavlink_message_t &message)
         break;
         case MAVLINK_MSG_ID_COMMAND_ACK:
         {
-            printf("Get ACK\n");
             pthread_mutex_lock(&_messages.mutex_cmd_ack);
             mavlink_msg_command_ack_decode(&message, &_messages.cmd_ack);
             pthread_cond_signal(&_messages._condition_cmd_ack);
