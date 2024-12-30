@@ -131,6 +131,7 @@ public:
     int write_buf(uint8_t *buf, uint16_t len);
 
     void open_serial();
+    void boot_serial();
     void open_serial(Serial_Mode mode);
     void close_serial();
 

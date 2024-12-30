@@ -7,6 +7,33 @@ uint32_t start_time;
 // ----------------------------------------------------------------------------------
 //   Time
 // ------------------- ---------------------------------------------------------------
+int progess = 0;
+void update_status_bar(int progress, int total, const std::string& status) {
+    
+    if (progress <= 0) progress = 0;
+    
+    int bar_width = 50;
+    float percent = (float)progress / total;
+    int pos = bar_width * percent;
+    std::cout << "\r" << std::string(100, ' ') << "\r"; 
+    std::cout << "[";
+    for (int i = 0; i < bar_width; ++i) {
+        if (i < pos) std::cout << "=";
+        else if (i == pos) std::cout << ">";
+        else std::cout << " ";
+    }
+
+    if (percent >= 100)
+    {
+        percent = 100;
+        std::cout<< "\33[92m" << "] " << int(percent * 100.0) << "% " << status << "\033[0m" <<"\r";
+    }
+    else{
+        std::cout << "] " << int(percent * 100.0) << "% " << status << "\r";
+    }
+    
+    std::cout.flush();
+}
 static uint64_t get_time_usec()
 {
     static struct timeval _timestamp;
@@ -45,7 +72,6 @@ bool BootloaderMavlink::init()
     if (_serial_port->status != SERIAL_PORT_OPEN)
     {
         _serial_port->open_serial();
-        printf("Open port\n");
     }
     pthread_mutex_init(&w_mutex, NULL);
     int result = pthread_create(&read_tid, NULL, &start_bootloader_read_thread, this);
@@ -89,7 +115,7 @@ bool BootloaderMavlink::run()
         return false;
     }
     uint8_t total_e = 0;
-
+    update_status_bar(0, 100, "Connection!");
     while (total_e < 10)
     {
 
@@ -113,7 +139,7 @@ bool BootloaderMavlink::run()
         uint64_t time  = lastest_timeslap_heartbeat();
         if (time > 20000)
         {
-            printf("Cannot communicate!\n");
+            update_status_bar(0, 100, "Cannot communication!");
             return false;
         }
         else if((time < 20000 && time > 3000) || !has_detected)
@@ -125,20 +151,21 @@ bool BootloaderMavlink::run()
         {
         case CONNECT:
         {
+            update_status_bar(0, 100, "Set baudrate!");
             err_t result = connect_seq();
             if (result == ERR_OK)
             {
-                printf("Set baud\n");
+
                 state = SETBAUD;
             }
             else if (result == ERR_SKIP)
             {
-                printf("Transmit\n");
+
                 state = TRANSMIT;
             }
             else
             {
-                printf("Connect err\n");
+
                 // state = TRANSMIT;
                 total_e++;
                 // return false;
@@ -162,13 +189,15 @@ bool BootloaderMavlink::run()
             break;
         case TRANSMIT:
         {
+            update_status_bar(0, 100, "Flash Firmware!");
             if(parse_bin_and_send_seq() == ERR_OK)
             {
                 return true;
             }            
             else
             {
-                total_e++;
+                update_status_bar(progess, 100, "Flash Firmware Failed!");
+                return false;
             }
         }
             break;
@@ -178,6 +207,7 @@ bool BootloaderMavlink::run()
         
         if (total_e >= 10)
         {
+            update_status_bar(progess, 100, "Flash Firmware Failed!");
             return false;
         }
         
@@ -239,7 +269,6 @@ bool  BootloaderMavlink::w_serial_control_sync(const mavlink_serial_control_t &s
     if (rt != ETIMEDOUT) {
         result = true;
         memcpy(&srl_receive, &_messages.sr_ctl, sizeof(mavlink_serial_control_t));
-        printf("Tra loi srl\n");
     }
     pthread_mutex_unlock(&_messages.mutex_srl);
 
@@ -250,13 +279,6 @@ bool  BootloaderMavlink::w_ftp_sync(const PayloadHeader &ftp_send, PayloadHeader
 {
     mavlink_message_t message = { 0 };
     const uint8_t * data = reinterpret_cast<const uint8_t*>(&ftp_send);
-    // printf("Send data -----------------------\n");
-    // printf("seq_number : %u\n",ftp_send.seq_number);
-    // printf("session : %u\n",ftp_send.session);
-    // printf("OP code : %u\n",ftp_send.opcode);
-    // printf("Data[0] : %u\n",data[0]);
-    // printf("Data[1] : %u\n",data[1]);
-    // printf("Data[2] : %u\n",data[2]);
     mavlink_msg_file_transfer_protocol_pack_chan(
                                                 _system.sysid, 
                                                 _system.compid, 
@@ -271,7 +293,7 @@ bool  BootloaderMavlink::w_ftp_sync(const PayloadHeader &ftp_send, PayloadHeader
     bool result = false;
     clock_gettime(CLOCK_REALTIME, &time_wait);
     // Wait for 1 sec timeout
-    time_wait.tv_sec += 5;
+    time_wait.tv_sec += 1;
     w_message(message);
     pthread_mutex_lock(&_messages.mutex_ftp);
     rt = pthread_cond_timedwait(&_messages._condition_ftp, &_messages.mutex_ftp, &time_wait);
@@ -280,14 +302,6 @@ bool  BootloaderMavlink::w_ftp_sync(const PayloadHeader &ftp_send, PayloadHeader
         {
             result = true;
             memcpy((&ftp_receive) , &_messages.ftp.payload[0] , sizeof(PayloadHeader));
-                printf("receive data -----------------------\n");
-                printf("Payload[0] : %u\n",_messages.ftp.payload[0]);
-                printf("Payload[1] : %u\n",_messages.ftp.payload[1]);
-                printf("Payload[2] : %u\n",_messages.ftp.payload[2]);
-                printf("Payload[5] : %u\n",_messages.ftp.payload[5]);
-                printf("seq_number : %u\n",ftp_receive.seq_number);
-                printf("session : %u\n",ftp_receive.session);
-                printf("OP code : %u\n",ftp_receive.opcode);
         }else
         {
             printf("Wrong ID\n");
@@ -295,7 +309,7 @@ bool  BootloaderMavlink::w_ftp_sync(const PayloadHeader &ftp_send, PayloadHeader
         
     }else
     {
-        printf("Time out in FTP\n");
+        // printf("Time out in FTP\n");
     }
     
     pthread_mutex_unlock(&_messages.mutex_ftp);
@@ -328,7 +342,7 @@ bool  BootloaderMavlink::w_reboot_sync(const mavlink_command_long_t &cmdlong, ma
         }
     }else
     {
-        printf("Timeout reboot!\n\n");
+        // printf("Timeout reboot!\n\n");
     }
     
     pthread_mutex_unlock(&_messages.mutex_cmd_ack);
@@ -365,7 +379,6 @@ BootloaderMavlink::err_t BootloaderMavlink::connect_seq()
     srl.target_system = _gimbal.sysid;
     srl.target_component = _gimbal.compid;
     mavlink_serial_control_t srl_receive{0};
-    printf("get baud1: %u\n",srl_receive.baudrate);
     
 
     if(!w_serial_control_sync(srl, srl_receive)) return ERR_TIMEOUT;
@@ -377,7 +390,6 @@ return ERR_UNKNOWN;
 
         } 
     
-    printf("get baud2: %u\n",srl_receive.baudrate);
     if (srl_receive.baudrate != srl.baudrate || srl_receive.baudrate == _serial_port->baudrate) return ERR_SKIP;
 
     return ERR_OK;
@@ -428,8 +440,6 @@ BootloaderMavlink::err_t BootloaderMavlink::parse_bin_and_send_seq()
             }
             ftp_rq.seq_number++;
             state_uploadfile = WRITE_DATA;
-            printf("write data\n");
-            printf("Total file: %llu\n",total_size);
         }
             break;
         case WRITE_DATA:
@@ -454,8 +464,8 @@ BootloaderMavlink::err_t BootloaderMavlink::parse_bin_and_send_seq()
                 }
                 ftp_rq.size = len;
                 write_state = SEND;
-                printf("Offset : %lu\n",offset);
-                printf("---------------\n");
+                // printf("Offset : %lu\n",offset);
+                // printf("---------------\n");
             }
             case SEND:
             {
@@ -475,7 +485,9 @@ BootloaderMavlink::err_t BootloaderMavlink::parse_bin_and_send_seq()
                 offset += ftp_rq.size;
                 ftp_rq.seq_number++;
                 write_state = PASER;
-                printf("---------------\n");
+                progess = (int)(offset * 100 / total_size);
+                update_status_bar(progess, 100, "Flash Firmware!");
+                // printf("---------------\n");
             }
                 break;
             default:
@@ -484,7 +496,7 @@ BootloaderMavlink::err_t BootloaderMavlink::parse_bin_and_send_seq()
             // Make sure write all the file
             if (offset >= total_size && write_state == PASER)
             {
-                printf("Offset : %lu\n",offset);
+                // printf("Offset : %lu\n",offset);
                 state_uploadfile = TERMINAL;
                 break;
             }
@@ -507,7 +519,7 @@ BootloaderMavlink::err_t BootloaderMavlink::parse_bin_and_send_seq()
                 break;
             }
             ftp_rq.seq_number++;
-            printf("Flash FW Success!\n");
+            update_status_bar(100, 100, "Flash FW Success!");
             return ERR_OK;
         }
             break;
@@ -515,7 +527,7 @@ BootloaderMavlink::err_t BootloaderMavlink::parse_bin_and_send_seq()
             break;
         }
         
-        if (err > 1)
+        if (err > 5)
         {
             return ERR_UNKNOWN;
         }

@@ -171,30 +171,16 @@ void Serial_Port::open_serial()
     // --------------------------------------------------------------------------
     //   CONTROL DTR & RTS
     // --------------------------------------------------------------------------
-    int RTS_flag;
-    int DTR_flag;
-    RTS_flag = TIOCM_RTS;
-    DTR_flag = TIOCM_DTR;
-    ioctl(fd, TIOCMBIS, &DTR_flag); //Set DTR pin
-    ioctl(fd, TIOCMBIC, &RTS_flag); //clear RTS pin
-    //getchar();
-    usleep(1000000);
-    ioctl(fd, TIOCMBIC, &DTR_flag); //Clear DTR pin
+    reset();
     // --------------------------------------------------------------------------
     //   FOOTER
     // --------------------------------------------------------------------------
     status = SERIAL_PORT_OPEN;
     printf("\n");
 }
-void Serial_Port::open_serial(Serial_Mode mode)
+void Serial_Port::boot_serial()
 {
-    if (mode == Serial_Port::RUNNING_MODE)
-    {
-        open_serial();
-    }
-    else
-    {
-        printf("OPEN PORT\n");
+printf("OPEN PORT\n");
         fd = _open_port(uart_name);
 
         // Check success
@@ -236,6 +222,16 @@ void Serial_Port::open_serial(Serial_Mode mode)
         // --------------------------------------------------------------------------
         status = SERIAL_PORT_BOOT;
         printf("\n");
+}
+void Serial_Port::open_serial(Serial_Mode mode)
+{
+    if (mode == Serial_Port::RUNNING_MODE)
+    {
+        open_serial();
+    }
+    else
+    {
+        boot_serial();
     }
     
     

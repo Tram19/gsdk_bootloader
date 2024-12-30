@@ -1926,7 +1926,7 @@ void Gimbal_Interface::read_thread(void)
                 for (int i = 0; i < result; ++i) {
                     // the parsing
                     if (mavlink_parse_char(_channel, (uint8_t)buf[i], &message, &mav_status)) {
-                        printf("Parse error: %u, Drop: %u, Success: %u\n",mav_status.parse_error,mav_status.packet_rx_drop_count,mav_status.packet_rx_success_count);
+                        // printf("Parse error: %u, Drop: %u, Success: %u\n",mav_status.parse_error,mav_status.packet_rx_drop_count,mav_status.packet_rx_success_count);
                         messages_handler(message);
                     }
                 }

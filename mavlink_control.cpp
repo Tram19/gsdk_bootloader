@@ -128,6 +128,262 @@ static bool upgrade_firmware(Gimbal_Interface &onboard, Serial_Port &serial_port
 
 static void monitor_attitude_imu_encoder(Gimbal_Interface &onboard, uint8_t duration);
 
+
+//test function
+void move10deY(Gimbal_Interface &onboard){
+    Gimbal_Interface :: limit_angle_t limit =  onboard.get_limit_angle_yaw();
+
+    GSDK_DebugInfo("YAW max: %d -- YAW min: %d\n" , limit.angle_max, limit.angle_min);
+    int i = 0;
+    attitude<float> myattitude;
+    myattitude= onboard.get_gimbal_attitude();
+    int yaw = round(myattitude.yaw);
+            
+    int dir = 1;
+    while (i++ < 2)
+    {
+
+        while (yaw <= limit.angle_max && yaw >= limit.angle_min)
+        {
+            printf("YAW - %d\r\n",yaw);
+            control_sample_gimbal_set_move_angle(onboard,0,0,yaw);
+            yaw += (10*dir);
+        }
+        printf("doi chieu\r\n");
+        dir = -dir;
+        yaw += (10*dir);
+        usleep(1000000);
+    }
+}
+
+void move10deT(Gimbal_Interface &onboard){
+    Gimbal_Interface :: limit_angle_t limit =  onboard.get_limit_angle_pitch();
+
+    GSDK_DebugInfo("TILT max: %d -- TILT min: %d\n" , limit.angle_max, limit.angle_min);
+    int i = 0;
+    attitude<float> myattitude;
+    myattitude= onboard.get_gimbal_attitude();
+    int pitch = round(myattitude.pitch);
+            
+    int dir = 1;
+    while (i++ < 2)
+    {
+
+        while (pitch <= limit.angle_max && pitch >= limit.angle_min)
+        {
+            printf("TILT - %d\r\n",pitch);
+            control_sample_gimbal_set_move_angle(onboard,pitch,0,0);
+            pitch += (10*dir);
+        }
+        printf("doi chieu\r\n");
+        dir = -dir;
+        pitch += (10*dir);
+        usleep(1000000);
+    }
+}
+
+void move10deR(Gimbal_Interface &onboard){
+    Gimbal_Interface :: limit_angle_t limit =  onboard.get_limit_angle_roll();
+
+    GSDK_DebugInfo("ROLL max: %d -- ROLL min: %d\n" , limit.angle_max, limit.angle_min);
+    int i = 0;
+    attitude<float> myattitude;
+    myattitude= onboard.get_gimbal_attitude();
+    int roll = round(myattitude.roll);
+            
+    int dir = 1;
+    while (i++ < 2)
+    {
+
+        while (roll <=  limit.angle_max && roll >= limit.angle_min)
+        {
+            printf("ROLL - %d\r\n",roll);
+            control_sample_gimbal_set_move_angle(onboard,0,roll,0);
+            roll += (10*dir);
+        }
+        printf("doi chieu\r\n");
+        dir = -dir;
+        roll += (10*dir);
+        usleep(1000000);
+    }
+}
+
+
+void testRateY(Gimbal_Interface &onboard){
+    control_sample_gimbal_set_move_rate(onboard,0,0,10,5);
+    control_sample_gimbal_set_move_rate(onboard,0,0,-10,5);
+    control_sample_gimbal_set_move_rate(onboard,0,0,20,2);
+    control_sample_gimbal_set_move_rate(onboard,0,0,-20,2);
+    control_sample_gimbal_set_move_rate(onboard,0,0,30,2);
+    control_sample_gimbal_set_move_rate(onboard,0,0,-30,2);
+}
+
+void testRateR(Gimbal_Interface &onboard){
+    control_sample_gimbal_set_move_rate(onboard,0,10,0,5);
+    control_sample_gimbal_set_move_rate(onboard,0,-10,0,5);
+    control_sample_gimbal_set_move_rate(onboard,0,20,0,2);
+    control_sample_gimbal_set_move_rate(onboard,0,-20,0,2);
+    control_sample_gimbal_set_move_rate(onboard,0,30,0,2);
+    control_sample_gimbal_set_move_rate(onboard,0,-30,0,2);
+}
+
+void testRateT(Gimbal_Interface &onboard){
+    control_sample_gimbal_set_move_rate(onboard,10,0,0,5);
+    control_sample_gimbal_set_move_rate(onboard,-10,0,0,5);
+    control_sample_gimbal_set_move_rate(onboard,20,0,0,2);
+    control_sample_gimbal_set_move_rate(onboard,-20,0,0,2);
+    control_sample_gimbal_set_move_rate(onboard,30,0,0,2);
+    control_sample_gimbal_set_move_rate(onboard,-30,0,0,2);
+}
+static void control_test(Gimbal_Interface &onboard)
+{
+    int number = 0;
+    while (number  < 14)
+    {
+        switch (number++ % 13)
+        {
+        case 0:
+            {
+                control_sample_gimbal_off(onboard);
+            }
+            break;
+        case 1:
+            {
+                control_sample_gimbal_on(onboard);
+                usleep(3000000);
+            }
+            break;
+        case 2:
+            {
+                // control_sample_gimbal_change_mount_mode(onboard);
+            }
+            break;
+        case 3:
+            {
+                control_sample_gimbal_get_gimbal_information(onboard);
+            }
+            break;
+        case 4:
+            {
+                control_sample_gimbal_set_lock_mode(onboard);
+            }
+            break;
+        case 5:
+        {   
+            if(control_sample_gimbal_set_lock_mode(onboard) == true){
+
+                if(gimbal_mode.mnt_mode == TWO_AXIS_GIMBAL_MOUNT_MODE_ROLL_TILT){
+                    move10deR(onboard);
+                    move10deT(onboard);
+                }else if (gimbal_mode.mnt_mode == TWO_AXIS_GIMBAL_MOUNT_MODE_PAN_TILT)
+                {
+                    move10deT(onboard);
+                    move10deY(onboard);
+                }else
+                {
+                    move10deR(onboard);
+                    move10deT(onboard);
+                    move10deY(onboard);
+                }
+                control_sample_gimbal_return_home(onboard);
+            }
+        }
+            break;
+        case 6:
+        {
+            if(control_sample_gimbal_set_lock_mode(onboard) == true){
+                if(gimbal_mode.mnt_mode == TWO_AXIS_GIMBAL_MOUNT_MODE_ROLL_TILT){
+                    testRateR(onboard);
+                    testRateT(onboard);
+                }else if (gimbal_mode.mnt_mode == TWO_AXIS_GIMBAL_MOUNT_MODE_PAN_TILT)
+                {
+                    testRateT(onboard);
+                    testRateY(onboard);
+                }else
+                {
+                    testRateR(onboard);
+                    testRateT(onboard);
+                    testRateY(onboard);
+                }
+                
+            control_sample_gimbal_return_home(onboard);
+            }
+        }
+            break;
+        case 7:
+        {
+            control_sample_gimbal_set_follow_mode(onboard);
+        }
+            break;
+        case 8:
+        {
+            if(control_sample_gimbal_set_follow_mode(onboard) == true){
+                if(gimbal_mode.mnt_mode == TWO_AXIS_GIMBAL_MOUNT_MODE_ROLL_TILT){
+                    move10deR(onboard);
+                    move10deT(onboard);
+                }else if (gimbal_mode.mnt_mode == TWO_AXIS_GIMBAL_MOUNT_MODE_PAN_TILT)
+                {
+                    move10deT(onboard);
+                    move10deY(onboard);
+                }else
+                {
+                    move10deR(onboard);
+                    move10deT(onboard);
+                    move10deY(onboard);
+                }
+                control_sample_gimbal_return_home(onboard);
+            }
+        }
+            break;
+        case 9:
+        {
+            if(control_sample_gimbal_set_follow_mode(onboard) == true){
+                if(gimbal_mode.mnt_mode == TWO_AXIS_GIMBAL_MOUNT_MODE_ROLL_TILT){
+                    testRateR(onboard);
+                    testRateT(onboard);
+                }else if (gimbal_mode.mnt_mode == TWO_AXIS_GIMBAL_MOUNT_MODE_PAN_TILT)
+                {
+                    testRateT(onboard);
+                    testRateY(onboard);
+                }else
+                {
+                    testRateR(onboard);
+                    testRateT(onboard);
+                    testRateY(onboard);
+                }
+                control_sample_gimbal_return_home(onboard);
+            }
+        }
+            break;
+        case 10:
+        {
+            control_sample_gimbal_set_mapping_mode(onboard);
+        }
+            break;
+        case 11:
+        {
+            control_sample_gimbal_return_home(onboard);
+        }
+            break;
+        case 12:
+        {
+            control_sample_gimbal_reboot(onboard);
+        }
+            break;
+        case 13:
+            
+            break;
+        case 14:
+            /* code */
+            break;
+        default:
+            break;
+        }
+        usleep(2000000);
+    }
+    
+       
+}
 // ------------------------------------------------------------------------------
 //   Gimbal sample control and get data
 // ------------------------------------------------------------------------------
@@ -476,8 +732,8 @@ static void control_sample_gimbal_process(Gimbal_Interface &onboard, Serial_Port
     printf("\t 13.  Set Gimbal Reboot\n\r");
     printf("\t 14.  Upgrade Firmware\n\r");
     printf("\t 15.  Monitoring Encoder - Attitude - IMU\n\r");
-    printf("\t 16.  Set pitch lock\n\r");
-    printf("\t 17.  Set pitch follow\n\r");
+    // printf("\t 16.  Set pitch lock\n\r");
+    // printf("\t 17.  Set pitch follow\n\r");
 
     scanf("%d", &number);
 
@@ -620,28 +876,29 @@ static void control_sample_gimbal_process(Gimbal_Interface &onboard, Serial_Port
             monitor_attitude_imu_encoder(onboard,duration);
         }
             break;
-        case 16: // Set pitch lock
-        {
-            if(onboard.set_pitch_mode(false) == Gimbal_Protocol::SUCCESS)
-            {
-                GSDK_DebugSuccess("Set pitch gimbal to LOCK MODE Successfully!\n");
-            }else{
-                GSDK_DebugWarning("Could not set pitch gimbal to LOCK MODE!\n");
-            }
-        }
-            break;
-        case 17: // Set pitch follow
-        {
-            if(onboard.set_pitch_mode(true) == Gimbal_Protocol::SUCCESS)
-            {
-                GSDK_DebugSuccess("Set pitch gimbal to FOLLOW MODE Successfully!\n");
-            }else{
-                GSDK_DebugWarning("Could not set pitch gimbal to FOLLOW MODE!\n");
-            }
-        }
-            break;
+        // case 16: // Set pitch lock
+        // {
+        //     if(onboard.set_pitch_mode(false) == Gimbal_Protocol::SUCCESS)
+        //     {
+        //         GSDK_DebugSuccess("Set pitch gimbal to LOCK MODE Successfully!\n");
+        //     }else{
+        //         GSDK_DebugWarning("Could not set pitch gimbal to LOCK MODE!\n");
+        //     }
+        // }
+        //     break;
+        // case 17: // Set pitch follow
+        // {
+        //     if(onboard.set_pitch_mode(true) == Gimbal_Protocol::SUCCESS)
+        //     {
+        //         GSDK_DebugSuccess("Set pitch gimbal to FOLLOW MODE Successfully!\n");
+        //     }else{
+        //         GSDK_DebugWarning("Could not set pitch gimbal to FOLLOW MODE!\n");
+        //     }
+        // }
+        //     break;
         default:
         {
+            control_test(onboard);
         }
         break;
     }
@@ -1635,22 +1892,23 @@ static void get_input_angle(float &pitch,float &roll, float &yaw){
 static void get_input_rate(float &pitch_rate,float &roll_rate, float &yaw_rate, uint8_t &duration){
     if (gimbal_mode.gimbal_type == THREE_AXIS)
     {
-        GSDK_DebugMsg("ROLL rate: ");
-        scanf("%f" , &roll_rate);
-        printf("\n");
+
         GSDK_DebugMsg("PITCH rate: ");
         scanf("%f" , &pitch_rate);
+        printf("\n");
+        GSDK_DebugMsg("ROLL rate: ");
+        scanf("%f" , &roll_rate);
         printf("\n");
         GSDK_DebugMsg("YAW rate: ");
         scanf("%f" , &yaw_rate);
     }
     else if (gimbal_mode.gimbal_type == TWO_AXIS && gimbal_mode.mnt_mode == TWO_AXIS_GIMBAL_MOUNT_MODE_ROLL_TILT)
     {
-        GSDK_DebugMsg("ROLL rate: ");
-        scanf("%f" , &roll_rate);
-        printf("\n");
         GSDK_DebugMsg("PITCH rate: ");
         scanf("%f" , &pitch_rate);
+        printf("\n");
+        GSDK_DebugMsg("ROLL rate: ");
+        scanf("%f" , &roll_rate);
         printf("\n");
         yaw_rate = 0;
     }
