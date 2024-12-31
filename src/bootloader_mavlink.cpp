@@ -9,7 +9,7 @@ uint32_t start_time;
 // ------------------- ---------------------------------------------------------------
 int progess = 0;
 void update_status_bar(int progress, int total, const std::string& status) {
-    
+    return;
     if (progress <= 0) progress = 0;
     
     int bar_width = 50;
@@ -116,7 +116,7 @@ bool BootloaderMavlink::run()
     }
     uint8_t total_e = 0;
     update_status_bar(0, 100, "Connection!");
-    usleep(50000000);//wait 2 seconds gimbal reboot.
+    usleep(30000000);//wait 2 seconds gimbal reboot.
     printf("SEND REBOOT\n");
     while (total_e < 10)
     {
@@ -281,6 +281,14 @@ bool  BootloaderMavlink::w_ftp_sync(const PayloadHeader &ftp_send, PayloadHeader
 {
     mavlink_message_t message = { 0 };
     const uint8_t * data = reinterpret_cast<const uint8_t*>(&ftp_send);
+    printf("Send data -----------------------\n");
+    printf("seq_number : %u\n",ftp_send.seq_number);
+    printf("session : %u\n",ftp_send.session);
+    printf("OP code : %u\n",ftp_send.opcode);
+    printf("Data[0] : %u\n",data[0]);
+    printf("Data[1] : %u\n",data[1]);
+    printf("Data[2] : %u\n",data[2]);
+
     mavlink_msg_file_transfer_protocol_pack_chan(
                                                 _system.sysid, 
                                                 _system.compid, 
@@ -304,6 +312,14 @@ bool  BootloaderMavlink::w_ftp_sync(const PayloadHeader &ftp_send, PayloadHeader
         {
             result = true;
             memcpy((&ftp_receive) , &_messages.ftp.payload[0] , sizeof(PayloadHeader));
+            printf("receive data -----------------------\n");
+            printf("Payload[0] : %u\n",_messages.ftp.payload[0]);
+            printf("Payload[1] : %u\n",_messages.ftp.payload[1]);
+            printf("Payload[2] : %u\n",_messages.ftp.payload[2]);
+            printf("Payload[5] : %u\n",_messages.ftp.payload[5]);
+            printf("seq_number : %u\n",ftp_receive.seq_number);
+            printf("session : %u\n",ftp_receive.session);
+            printf("OP code : %u\n",ftp_receive.opcode);
         }else
         {
             printf("Wrong ID\n");
@@ -442,6 +458,11 @@ BootloaderMavlink::err_t BootloaderMavlink::parse_bin_and_send_seq()
                 err ++;
                 break;
             }
+            if (ftp_rs.size == 1)
+            {
+                max_data_length = ftp_rs.data[0];
+            }
+            
             ftp_rq.seq_number++;
             state_uploadfile = WRITE_DATA;
         }

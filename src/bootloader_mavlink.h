@@ -17,6 +17,8 @@
 #define PACK(__Declaration__) __Declaration__ __attribute__((__packed__))
 #endif
 
+#define MAX_DATA_LEN 220
+
 using namespace std;
 
 class BootloaderMavlink
@@ -45,7 +47,7 @@ public:
         RSP_NAK ///< Nak response
     };
     /// @brief Maximum data size in RequestHeader::data
-    static constexpr uint8_t max_data_length = 128; 
+    uint8_t max_data_length = MAX_DATA_LEN; 
 
     /// @brief This is the payload which is in mavlink_file_transfer_protocol_t.payload.
     /// This needs to be packed, because it's typecasted from
@@ -61,7 +63,7 @@ public:
         ///< packets complete, 0: More burst packets coming.
         uint8_t padding; ///< 32 bit alignment padding
         uint32_t offset; ///< Offsets for List and Read commands
-        uint8_t data[max_data_length]; ///< command data, varies by Opcode
+        uint8_t data[MAX_DATA_LEN]; ///< command data, varies by Opcode
     });
     PACK(struct FirmwareInfo {
         uint32_t total_size; ///< Total size of the file 
