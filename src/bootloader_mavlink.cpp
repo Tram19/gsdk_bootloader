@@ -116,7 +116,7 @@ bool BootloaderMavlink::run()
     }
     uint8_t total_e = 0;
     update_status_bar(0, 100, "Connection!");
-    usleep(30000000);//wait 2 seconds gimbal reboot.
+    usleep(20000000);//wait 2 seconds gimbal reboot.
     printf("SEND REBOOT\n");
     while (total_e < 10)
     {
@@ -131,10 +131,11 @@ bool BootloaderMavlink::run()
         }
         
     }
-    if (total_e >= 5)
+    if (total_e >= 10)
     {
         return false;
     }
+    has_detected = false;
     total_e = 0;
     while (1)
     {
@@ -368,13 +369,15 @@ bool  BootloaderMavlink::w_reboot_sync(const mavlink_command_long_t &cmdlong, ma
 }
 BootloaderMavlink::err_t BootloaderMavlink::reboot_seq()
 {
+    if(!has_detected) return ERR_SKIP;
     mavlink_command_long_t cmd_long{0};
     mavlink_command_ack_t  cmd_ack{0};
     cmd_long.command = MAV_CMD_PREFLIGHT_REBOOT_SHUTDOWN;
     cmd_long.param3  = 3;
     cmd_long.param4  = expect_compid;
     cmd_long.target_component = expect_compid;
-    cmd_long.target_system = 1;
+    cmd_long.target_system = _gimbal.sysid;
+    printf("Send reboot, sys : %u, comp: %u\n", _gimbal.sysid ,expect_compid);
     if(!w_reboot_sync(cmd_long, cmd_ack))
     {
         printf("Reboot Time out: %u\n",cmd_ack.result);
@@ -665,9 +668,10 @@ void BootloaderMavlink::messages_handler(const mavlink_message_t &message)
         {
             pthread_mutex_lock(&_messages.mutex);
             mavlink_msg_heartbeat_decode(&message, &_messages.heartbeat);
-            if (!has_detected && message.compid == expect_compid)
+            if (message.compid == expect_compid)
             {
                 // Store message sysid and compid.
+                
                 _gimbal.sysid  = message.sysid;
                 _gimbal.compid = message.compid;
                 has_detected = true;

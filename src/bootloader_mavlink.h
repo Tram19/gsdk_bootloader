@@ -168,7 +168,7 @@ private:
     messages_t          _messages;
     pthread_mutex_t     w_mutex;
     queue<mavlink_message_t> w_queue;
-    mavlink_system_t    _system{1,MAV_COMP_ID_ONBOARD_COMPUTER};
+    mavlink_system_t    _system{240,250};
     mavlink_system_t    _gimbal{};
     uint64_t            timeslap_hb {0};
     uint8_t expect_compid{0};
