@@ -116,6 +116,8 @@ bool BootloaderMavlink::run()
     }
     uint8_t total_e = 0;
     update_status_bar(0, 100, "Connection!");
+    usleep(50000000);//wait 2 seconds gimbal reboot.
+    printf("SEND REBOOT\n");
     while (total_e < 10)
     {
 
@@ -353,11 +355,13 @@ BootloaderMavlink::err_t BootloaderMavlink::reboot_seq()
     mavlink_command_long_t cmd_long{0};
     mavlink_command_ack_t  cmd_ack{0};
     cmd_long.command = MAV_CMD_PREFLIGHT_REBOOT_SHUTDOWN;
-    cmd_long.param4  = 1;
+    cmd_long.param3  = 3;
+    cmd_long.param4  = expect_compid;
     cmd_long.target_component = expect_compid;
     cmd_long.target_system = 1;
     if(!w_reboot_sync(cmd_long, cmd_ack))
     {
+        printf("Reboot Time out: %u\n",cmd_ack.result);
         return ERR_TIMEOUT;
     } 
 
@@ -669,6 +673,7 @@ void BootloaderMavlink::messages_handler(const mavlink_message_t &message)
         break;
         case MAVLINK_MSG_ID_COMMAND_ACK:
         {
+            printf("GOT ACK!\n");
             pthread_mutex_lock(&_messages.mutex_cmd_ack);
             mavlink_msg_command_ack_decode(&message, &_messages.cmd_ack);
             pthread_cond_signal(&_messages._condition_cmd_ack);
