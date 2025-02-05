@@ -230,6 +230,7 @@ public:
         RC_TYPE_LB2_NORMAL = 11,
 
         RC_TYPE_HERELINK   = 14,
+        
     };
 
     Gimbal_Interface() = delete;

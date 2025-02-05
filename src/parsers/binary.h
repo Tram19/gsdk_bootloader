@@ -26,6 +26,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <crc32.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -57,6 +58,8 @@ parser_err_t binary_close(void *storage) ;
 parser_err_t binary_read(void *storage, void *data, unsigned int *len);
 
 parser_err_t binary_write(void *storage, void *data, unsigned int len);
+
+parser_err_t binary_crc32(void *storage, uint32_t *crc32);
 
 #ifdef __cplusplus
 }

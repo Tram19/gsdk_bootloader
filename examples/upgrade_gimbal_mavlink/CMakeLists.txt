@@ -15,6 +15,7 @@ set(UPGRADE_GIMBAL_MAVLINK_SRC
     upgrade_gimbal_mavlink.cpp
     ${MAVLINK_SRC}/parsers/utils.cpp
     ${MAVLINK_SRC}/parsers/binary.c
+    ${MAVLINK_SRC}/parsers/crc32.c
     ${MAVLINK_SRC}/bootloader_mavlink.cpp
     ${MAVLINK_SRC}/gimbal_interface.cpp
     ${MAVLINK_SRC}/gimbal_protocol.cpp

@@ -122,3 +122,42 @@ parser_err_t binary_write(void *storage, void *data, unsigned int len) {
 	return PARSER_ERR_OK;
 }
 
+parser_err_t binary_crc32(void *storage, uint32_t *crc32)
+{
+	binary_t *st = (binary_t *)storage;
+	if (st->write) return PARSER_ERR_WRONLY;
+
+	if (lseek(st->fd, 0, SEEK_SET) == (off_t)-1) {
+		perror("lseek error");
+	}
+	*crc32 = 0xFFFFFFFF;
+	uint32_t offset = 0;
+	uint32_t total_size = (uint32_t)st->stat.st_size;
+	printf("Total size: %d\n", total_size);
+	uint16_t max_data_length = 1024;
+	unsigned char buf[1024];
+	while (offset < total_size)
+	{
+		uint32_t left	= total_size - offset;
+        uint32_t len 	= max_data_length > left ? left : max_data_length;
+        uint32_t len_t 	= len;
+
+		if(binary_read(storage,buf,&len) != PARSER_ERR_OK)
+		{
+			return PARSER_ERR_SYSTEM;
+		}
+        if (len == 0 && offset <= total_size)
+        {
+            return PARSER_ERR_SYSTEM;
+        }
+		*crc32 = xcrc32(buf, len, *crc32);
+		offset += len;
+		printf("CRC32: %x\n", *crc32);
+	}
+	printf("Offset: %d\n", offset);
+	if (lseek(st->fd, 0, SEEK_SET) == (off_t)-1) {
+		perror("lseek error");
+	}
+	*crc32 = ~*crc32;
+	return PARSER_ERR_OK;
+}

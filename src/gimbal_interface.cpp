@@ -225,6 +225,7 @@ void Gimbal_Interface::messages_handler(const mavlink_message_t &message)
                     mavlink_msg_gimbal_device_information_decode(&message, &_messages.gimbal_device_info);
                     _messages.timestamps.gimbal_device_info = get_time_usec();
                     GSDK_DebugInfo("GET GIMBAL DEVICE: \n");
+                    GSDK_DebugInfo("FW Version: %u\n", _messages.gimbal_device_info.firmware_version);
                     GSDK_DebugInfo("Vendor name: %s\n", _messages.gimbal_device_info.vendor_name);
                     GSDK_DebugInfo("Model name: %s\n", _messages.gimbal_device_info.model_name);
                     pthread_mutex_unlock(&_messages.mutex);
@@ -1739,6 +1740,8 @@ void Gimbal_Interface::write_heartbeat(void)
 // ------------------------------------------------------------------------------
 void Gimbal_Interface::start()
 {
+
+    usleep(20000000); // wait for 1s to let the port start
     time_to_exit = false;
     int result = 0;
 

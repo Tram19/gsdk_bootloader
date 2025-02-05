@@ -67,6 +67,7 @@ public:
     });
     PACK(struct FirmwareInfo {
         uint32_t total_size; ///< Total size of the file 
+        uint32_t crc32; ///< CRC32 of the file
         uint8_t x;
         uint8_t y;
         uint8_t z;

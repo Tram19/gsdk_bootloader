@@ -9,7 +9,6 @@ uint32_t start_time;
 // ------------------- ---------------------------------------------------------------
 int progess = 0;
 void update_status_bar(int progress, int total, const std::string& status) {
-    return;
     if (progress <= 0) progress = 0;
     
     int bar_width = 50;
@@ -91,6 +90,12 @@ bool BootloaderMavlink::init()
 		fprintf(stderr, "Parser failed to open\n");
         return false;
 	}
+    uint32_t crc32;
+
+    binary_crc32(p_st, &crc32);
+
+    printf("CRC32: %x\n", crc32);
+
     init_flag = true;
     start_time = get_time_msec();
     timeslap_hb = get_time_msec();
@@ -116,15 +121,14 @@ bool BootloaderMavlink::run()
     }
     uint8_t total_e = 0;
     update_status_bar(0, 100, "Connection!");
-    usleep(20000000);//wait 2 seconds gimbal reboot.
     printf("SEND REBOOT\n");
     while (total_e < 10)
     {
-
         if(reboot_seq() != ERR_OK)
         {
             total_e++;
             usleep(2000000);//wait 2 seconds gimbal reboot.
+            printf("REBOOT FAIL\n");
         }else
         {
             break;
@@ -408,10 +412,9 @@ BootloaderMavlink::err_t BootloaderMavlink::connect_seq()
 
     if (srl_receive.target_component != _system.compid && srl_receive.target_system != _system.sysid &&
         srl_receive.device == SERIAL_CONTROL_SERIAL0 && srl_receive.flags == SERIAL_CONTROL_FLAG_REPLY) 
-        {
-return ERR_UNKNOWN;
-
-        } 
+    {
+        return ERR_UNKNOWN;
+    } 
     
     if (srl_receive.baudrate != srl.baudrate || srl_receive.baudrate == _serial_port->baudrate) return ERR_SKIP;
 
@@ -445,6 +448,7 @@ BootloaderMavlink::err_t BootloaderMavlink::parse_bin_and_send_seq()
             ftp_rq.size             = sizeof(FirmwareInfo);
             FirmwareInfo            fw_info{0};
             fw_info.total_size = total_size;
+            binary_crc32(p_st, &fw_info.crc32);
             memcpy(&ftp_rq.data[0],&fw_info,sizeof(FirmwareInfo));
             ftp_rq.burst_complete   = 0;
             ftp_rq.offset           = 0;
@@ -666,6 +670,7 @@ void BootloaderMavlink::messages_handler(const mavlink_message_t &message)
         {
         case MAVLINK_MSG_ID_HEARTBEAT: 
         {
+            printf("Got heartbeat\n");
             pthread_mutex_lock(&_messages.mutex);
             mavlink_msg_heartbeat_decode(&message, &_messages.heartbeat);
             if (message.compid == expect_compid)

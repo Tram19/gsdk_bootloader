@@ -444,6 +444,7 @@ int gGimbal_sample(int argc, char **argv)
     serial_port.start();
     gimbal_interface.start();
 
+
     /// Process data
     while (!gimbal_interface.get_flag_exit()) {
         
@@ -649,7 +650,7 @@ void quit_handler(int sig)
 // ------------------------------------------------------------------------------
 int main(int argc, char **argv)
 {
-
+    
 
     // This program uses throw, wrap one big try/catch here
     try {
@@ -952,8 +953,6 @@ static void setting_sample_gimbal_setup_param_startup(Gimbal_Interface &onboard)
             }
         }
 
-
-        
     }
 
     {
