@@ -121,6 +121,7 @@ bool BootloaderMavlink::run()
         return false;
     }
     uint8_t total_e = 0;
+    sleep(20);
     update_status_bar(0, 100, "Connection!");
     printf("SEND REBOOT\n");
     while (total_e < 10)
@@ -184,7 +185,7 @@ bool BootloaderMavlink::run()
         case SETBAUD:
         {
             _serial_port->stop();
-            _serial_port->baudrate = 460800;
+            _serial_port->baudrate = 921600;
             _serial_port->start();
             has_detected = false;
             state = WAIT_SETBAUD;
@@ -402,7 +403,7 @@ BootloaderMavlink::err_t BootloaderMavlink::connect_seq()
     srl.device = SERIAL_CONTROL_SERIAL0;
     srl.flags = SERIAL_CONTROL_FLAG_RESPOND;
     srl.timeout = 1000; // timeout 1s
-    srl.baudrate = 115200;
+    srl.baudrate = 921600;
     srl.count = 0;
     srl.target_system = _gimbal.sysid;
     srl.target_component = _gimbal.compid;
@@ -450,7 +451,6 @@ BootloaderMavlink::err_t BootloaderMavlink::parse_bin_and_send_seq()
             FirmwareInfo            fw_info{0};
             fw_info.total_size = total_size;
             binary_crc32(p_st, &fw_info.crc32);
-            // fw_info.crc32 = 0;
             memcpy(&ftp_rq.data[0],&fw_info,sizeof(FirmwareInfo));
             ftp_rq.burst_complete   = 0;
             ftp_rq.offset           = 0;
