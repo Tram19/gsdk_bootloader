@@ -157,6 +157,6 @@ parser_err_t binary_crc32(void *storage, uint32_t *crc32)
 	if (lseek(st->fd, 0, SEEK_SET) == (off_t)-1) {
 		perror("lseek error");
 	}
-	*crc32 = ~*crc32;
+	// *crc32 = ~*crc32;
 	return PARSER_ERR_OK;
 }
