@@ -899,7 +899,12 @@ static void control_sample_gimbal_process(Gimbal_Interface &onboard, Serial_Port
         //     break;
         default:
         {
-            control_test(onboard);
+            
+            Gimbal_Interface::limit_angle_t limit_angle = {
+                .angle_min = -45,
+                .angle_max = 45
+            };
+            onboard.set_limit_angle_yaw(limit_angle);
         }
         break;
     }

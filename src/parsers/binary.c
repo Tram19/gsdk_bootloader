@@ -152,7 +152,6 @@ parser_err_t binary_crc32(void *storage, uint32_t *crc32)
         }
 		*crc32 = xcrc32(buf, len, *crc32);
 		offset += len;
-		printf("CRC32: %x\n", *crc32);
 	}
 	printf("Offset: %d\n", offset);
 	if (lseek(st->fd, 0, SEEK_SET) == (off_t)-1) {

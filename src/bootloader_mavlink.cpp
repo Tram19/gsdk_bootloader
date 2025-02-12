@@ -9,6 +9,7 @@ uint32_t start_time;
 // ------------------- ---------------------------------------------------------------
 int progess = 0;
 void update_status_bar(int progress, int total, const std::string& status) {
+    return;
     if (progress <= 0) progress = 0;
     
     int bar_width = 50;
@@ -240,7 +241,7 @@ void  BootloaderMavlink::w_heartbeat()
 {
     mavlink_heartbeat_t heartbeat = { 0 };
     heartbeat.type 			= MAV_TYPE_ONBOARD_CONTROLLER;
-    heartbeat.autopilot 	= MAV_AUTOPILOT_INVALID;
+    heartbeat.autopilot 	= MAV_AUTOPILOT_ARDUPILOTMEGA;
     heartbeat.base_mode 	= 0;
     heartbeat.custom_mode 	= 0;
     heartbeat.system_status = MAV_STATE_ACTIVE;
@@ -449,6 +450,7 @@ BootloaderMavlink::err_t BootloaderMavlink::parse_bin_and_send_seq()
             FirmwareInfo            fw_info{0};
             fw_info.total_size = total_size;
             binary_crc32(p_st, &fw_info.crc32);
+            // fw_info.crc32 = 0;
             memcpy(&ftp_rq.data[0],&fw_info,sizeof(FirmwareInfo));
             ftp_rq.burst_complete   = 0;
             ftp_rq.offset           = 0;
@@ -593,6 +595,7 @@ void BootloaderMavlink::read_thread(void)
     while (!time_to_exit) {
         if (_serial_port->status == SERIAL_PORT_OPEN)
         {
+            
             char buf[256] = { 0 };
             int result = _serial_port->read_message(buf, 256);
             for (int i = 0; i < result; ++i) {
