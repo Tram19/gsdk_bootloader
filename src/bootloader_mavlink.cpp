@@ -121,7 +121,7 @@ bool BootloaderMavlink::run()
         return false;
     }
     uint8_t total_e = 0;
-    sleep(20);
+    // sleep(20);
     update_status_bar(0, 100, "Connection!");
     printf("SEND REBOOT\n");
     while (total_e < 10)
@@ -141,6 +141,7 @@ bool BootloaderMavlink::run()
     {
         return false;
     }
+    _gimbal.sysid = 1;
     has_detected = false;
     total_e = 0;
     while (1)
@@ -155,7 +156,7 @@ bool BootloaderMavlink::run()
         {
             continue;
         }
-        
+
         switch (state)
         {
         case CONNECT:
@@ -185,7 +186,7 @@ bool BootloaderMavlink::run()
         case SETBAUD:
         {
             _serial_port->stop();
-            _serial_port->baudrate = 921600;
+            _serial_port->baudrate = 115200;
             _serial_port->start();
             has_detected = false;
             state = WAIT_SETBAUD;
@@ -256,6 +257,7 @@ void  BootloaderMavlink::w_heartbeat()
     // --------------------------------------------------------------------------
     //   WRITE
     // --------------------------------------------------------------------------
+    printf("Send HEARTBEAT\n");
     if (w_message(message) <= 0)
         printf("WARNING: could not send HEARTBEAT\n");
 
@@ -403,7 +405,7 @@ BootloaderMavlink::err_t BootloaderMavlink::connect_seq()
     srl.device = SERIAL_CONTROL_SERIAL0;
     srl.flags = SERIAL_CONTROL_FLAG_RESPOND;
     srl.timeout = 1000; // timeout 1s
-    srl.baudrate = 921600;
+    srl.baudrate = 115200;
     srl.count = 0;
     srl.target_system = _gimbal.sysid;
     srl.target_component = _gimbal.compid;
@@ -679,7 +681,8 @@ void BootloaderMavlink::messages_handler(const mavlink_message_t &message)
             if (message.compid == expect_compid)
             {
                 // Store message sysid and compid.
-                
+                printf("Got heartbeat from compid: %u\n",message.compid);
+                printf("Got heartbeat from sysid: %u\n",message.sysid);
                 _gimbal.sysid  = message.sysid;
                 _gimbal.compid = message.compid;
                 has_detected = true;
