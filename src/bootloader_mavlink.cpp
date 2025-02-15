@@ -2,6 +2,7 @@
 #include <iostream>
 #include "bootloader_mavlink.h"
 
+
 namespace fs = std::filesystem;
 uint32_t start_time;
 // ----------------------------------------------------------------------------------
@@ -80,23 +81,10 @@ bool BootloaderMavlink::init()
     result = pthread_create(&write_tid, NULL, &start_bootloader_write_thread, this);
     if (result) throw result;
     // try to init parser
-    p_st = binary_init();
-    if (!p_st)
-    {
-        fprintf(stderr, " Parser failed to initialize\n");
-        return false;
-    }
+    if(!gremsy_open(path)) return false;
 
-	if (binary_open(p_st, path.c_str(), 0) != PARSER_ERR_OK) {
-		fprintf(stderr, "Parser failed to open\n");
-        return false;
-	}
-    uint32_t crc32;
-
-    binary_crc32(p_st, &crc32);
-
-    printf("CRC32: %x\n", crc32);
-
+    std::cout<< "Size: " << gremsy_size() << std::endl;
+    std::cout<< "Crc32: " << gremsy_crc32() << std::endl;
     init_flag = true;
     start_time = get_time_msec();
     timeslap_hb = get_time_msec();
@@ -109,7 +97,7 @@ bool BootloaderMavlink::close()
         pthread_mutex_destroy(&w_mutex);
         pthread_cancel(read_tid);
         pthread_cancel(write_tid);
-        binary_close(p_st);
+        gremsy_close();
     }
     return true;
 }
@@ -428,7 +416,7 @@ BootloaderMavlink::err_t BootloaderMavlink::connect_seq()
 BootloaderMavlink::err_t BootloaderMavlink::parse_bin_and_send_seq()
 {
     unsigned int size = 0;
-    uint32_t total_size = binary_size(p_st);
+    uint32_t total_size = gremsy_size();
     PayloadHeader ftp_rq = {0};
     PayloadHeader ftp_rs = {0};
     StateUploadFile state_uploadfile = CREATE_FILE;
@@ -440,19 +428,20 @@ BootloaderMavlink::err_t BootloaderMavlink::parse_bin_and_send_seq()
     uint32_t offset = 0;
     
     WriteDataState write_state = PASER;
-    
+    std::vector<unsigned char> image = gremsy_read();
     while (1)
     {
         switch (state_uploadfile)
         {
         case CREATE_FILE:
         {
+            
             ftp_rq.session          = 0;
             ftp_rq.opcode           = Opcode::CMD_CREATE_FILE;
             ftp_rq.size             = sizeof(FirmwareInfo);
             FirmwareInfo            fw_info{0};
             fw_info.total_size = total_size;
-            binary_crc32(p_st, &fw_info.crc32);
+            fw_info.crc32 = gremsy_crc32();
             memcpy(&ftp_rq.data[0],&fw_info,sizeof(FirmwareInfo));
             ftp_rq.burst_complete   = 0;
             ftp_rq.offset           = 0;
@@ -488,16 +477,7 @@ BootloaderMavlink::err_t BootloaderMavlink::parse_bin_and_send_seq()
                 uint32_t left	= total_size - offset;
                 uint32_t len = max_data_length > left ? left : max_data_length;
                 uint32_t len_t = len;
-                if(binary_read(p_st,ftp_rq.data,&len) != PARSER_ERR_OK)
-                {
-                    err ++;
-                    break;
-                }
-                if (len == 0 && offset <= total_size)
-                {
-                    err ++;
-                    break;
-                }
+                memcpy(&ftp_rq.data[0],&image[offset],len);
                 ftp_rq.size = len;
                 write_state = SEND;
                 // printf("Offset : %lu\n",offset);

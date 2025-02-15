@@ -4,23 +4,24 @@ cmake_minimum_required(VERSION 3.15)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}
                     ${CMAKE_CURRENT_SOURCE_DIR}/src/parsers
                     ${MAVLINK_INCLUDES}
                     )
 
-
+include(FetchContent)
+FetchContent_Declare(
+                    json
+                    URL https://github.com/nlohmann/json/releases/download/v3.11.3/json.tar.xz
+                    )
+FetchContent_MakeAvailable(json)
 set(UPGRADE_GIMBAL_MAVLINK_SRC
     upgrade_gimbal_mavlink.cpp
     ${MAVLINK_SRC}/parsers/utils.cpp
     ${MAVLINK_SRC}/parsers/binary.c
     ${MAVLINK_SRC}/parsers/crc32.c
+    ${MAVLINK_SRC}/parsers/parse.cpp
     ${MAVLINK_SRC}/bootloader_mavlink.cpp
-    ${MAVLINK_SRC}/gimbal_interface.cpp
-    ${MAVLINK_SRC}/gimbal_protocol.cpp
-    ${MAVLINK_SRC}/gimbal_protocol_v1.cpp
-    ${MAVLINK_SRC}/gimbal_protocol_v2.cpp
     ${MAVLINK_SRC}/serial_port.cpp
 )
 add_executable(upgrade_gimbal_mavlink ${UPGRADE_GIMBAL_MAVLINK_SRC})
@@ -28,4 +29,5 @@ add_executable(upgrade_gimbal_mavlink ${UPGRADE_GIMBAL_MAVLINK_SRC})
 find_package( Threads )
 target_link_libraries(upgrade_gimbal_mavlink
                     ${CMAKE_THREAD_LIBS_INIT}
+                    nlohmann_json::nlohmann_json
                     )

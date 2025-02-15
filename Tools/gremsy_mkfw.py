@@ -99,7 +99,7 @@ def mkdesc():
     return proto
 
 # Parse command line arguments
-parser = argparse.ArgumentParser(description="Firmware generator for the PX autopilot system.")
+parser = argparse.ArgumentParser(description="Firmware generator.")
 parser.add_argument("--board_id", action="store", help="set the board ID required")
 parser.add_argument("--version", action="store", help="set a version string")
 parser.add_argument("--description", action="store", help="set a longer description")

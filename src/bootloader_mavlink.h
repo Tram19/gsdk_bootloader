@@ -3,11 +3,11 @@
 #include <string>
 #include <vector>
 #include "serial_port.h"
-#include "parsers/binary.h"
 #include <signal.h>
 #include <time.h>
 #include <sys/time.h>
 #include <queue>
+#include "parse.h"
 
 // As found in
 // https://stackoverflow.com/questions/1537964#answer-3312896
@@ -157,7 +157,6 @@ private:
     };
     string		        path;
     Serial_Port         *_serial_port;
-    void		        *p_st		        = NULL;
     bool                time_to_exit        {false};  
     bool                has_detected        {false};
     mavlink_channel_t   _channel            {MAVLINK_COMM_0};
