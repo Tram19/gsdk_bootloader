@@ -21,6 +21,22 @@
 
 using namespace std;
 
+#define DEBUG 1
+
+#if (DEBUG == 1)
+# define GSDK_DebugMsg(fmt, args ...)           do {printf("\33[39m" fmt "\033[0m\r",  ## args); } while(0);
+# define GSDK_DebugInfo(fmt, args ...)          do {printf("\33[34m" fmt "\033[0m\r", ## args); } while(0);
+# define GSDK_DebugWarning(fmt, args ...)       do {printf("\33[33m" fmt "\033[0m\r", ## args); } while(0);
+# define GSDK_DebugError(fmt, args ...)         do {printf("\33[91m" fmt "\033[0m\r", ## args); } while(0);
+# define GSDK_DebugSuccess(fmt, args ...)       do {printf("\33[92m" fmt "\033[0m\r", ## args); } while(0);
+#else
+# define GSDK_DebugMsg(fmt, args ...)
+# define GSDK_DebugInfo(fmt, args ...)
+# define GSDK_DebugWarning(fmt, args ...)
+# define GSDK_DebugError(fmt, args ...)
+# define GSDK_DebugSuccess(fmt, args ...)
+#endif
+
 class BootloaderMavlink
 {
 public:
@@ -98,6 +114,7 @@ public:
 
 private:
     enum State : uint8_t{
+        SEND_REBOOT,
         CONNECT,
         SETBAUD,
         WAIT_SETBAUD,
@@ -172,6 +189,7 @@ private:
     mavlink_system_t    _gimbal{};
     uint64_t            timeslap_hb {0};
     uint8_t expect_compid{0};
+    int expect_baudrate {115200};
 
     void  read_thread(void);
     void  write_thread(void);

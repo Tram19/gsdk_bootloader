@@ -3,7 +3,7 @@ import argparse
 import json
 import time
 import base64
-# CRC32 table theo mẫu của C
+
 crc32_table = (
     0x00000000, 0x04c11db7, 0x09823b6e, 0x0d4326d9,
     0x130476dc, 0x17c56b6b, 0x1a864db2, 0x1e475005,
@@ -89,7 +89,8 @@ def xcrc32(data: bytes, init: int) -> int:
 
 def mkdesc():
     proto = {}
-    proto['board_id']    = 0
+    proto['gimbal_id']    = 0
+    proto['gimbal_name'] = ""
     proto['version']     = ""
     proto['description'] = ""
     proto['build_time']  = 0
@@ -100,7 +101,8 @@ def mkdesc():
 
 # Parse command line arguments
 parser = argparse.ArgumentParser(description="Firmware generator.")
-parser.add_argument("--board_id", action="store", help="set the board ID required")
+parser.add_argument("--gimbal_id", action="store", help="set the gimbal ID required")
+parser.add_argument("--gimbal_name", action="store", help="set the gimbal ID required")
 parser.add_argument("--version", action="store", help="set a version string")
 parser.add_argument("--description", action="store", help="set a longer description")
 parser.add_argument("--image", action="store", help="the firmware image")
@@ -109,10 +111,12 @@ args = parser.parse_args()
 desc = mkdesc()
 desc['build_time'] = int(time.time())
 
-if args.board_id is not None:
-    desc['board_id'] = int(args.board_id)
+if args.gimbal_id is not None:
+    desc['gimbal_id'] = int(args.gimbal_id)
+if args.gimbal_name is not None:
+    desc['gimbal_name'] = str(args.gimbal_name)
 if args.version is not None:
-    desc['version'] = str(args.version)
+    desc['version'] = int(args.version)
 if args.description is not None:
     desc['description'] = str(args.description)
 if args.image is not None:
@@ -122,15 +126,11 @@ if args.image is not None:
         print(f"Read {len(data)} bytes from {args.image}")
         
     desc['image_size'] = len(data)
-    # Nếu muốn lưu dữ liệu nhị phân trực tiếp dưới dạng chuỗi, bạn có thể dùng latin1:
     desc['image'] = data.hex()
     desc['crc32'] = xcrc32(data, 0xffffffff)
-    # Nếu muốn, bạn cũng có thể dùng base64:
-    # import base64
-    # desc['image'] = base64.b64encode(data).decode('utf-8')
 
-# Ghi kết quả ra file với đuôi .gremsy
-output_file = "firmware.gremsy"
+
+output_file = (f"gremsy{desc['gimbal_name']}_v{desc['version']}.gremsy")
 with open(output_file, "w") as f:
     f.write(json.dumps(desc, indent=4))
 

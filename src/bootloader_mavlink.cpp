@@ -72,6 +72,7 @@ bool BootloaderMavlink::init()
 {
     if (_serial_port->status != SERIAL_PORT_OPEN)
     {
+        _serial_port->baudrate = expect_baudrate;
         _serial_port->open_serial();
     }
     pthread_mutex_init(&w_mutex, NULL);
@@ -81,10 +82,12 @@ bool BootloaderMavlink::init()
     result = pthread_create(&write_tid, NULL, &start_bootloader_write_thread, this);
     if (result) throw result;
     // try to init parser
-    if(!gremsy_open(path)) return false;
+    if(!gremsy_open(path))
+    {
+        GSDK_DebugError("Cannot open file %s\n", path.c_str());
+        return false;
+    }
 
-    std::cout<< "Size: " << gremsy_size() << std::endl;
-    std::cout<< "Crc32: " << gremsy_crc32() << std::endl;
     init_flag = true;
     start_time = get_time_msec();
     timeslap_hb = get_time_msec();
@@ -105,33 +108,12 @@ bool BootloaderMavlink::run()
 {
     if (!init_flag)
     {
-        printf("Bootloader Mavlink is not initialized yet!\n");
+        GSDK_DebugError("Bootloader Mavlink is not initialized yet!\n");
         return false;
     }
     uint8_t total_e = 0;
-    // sleep(20);
     update_status_bar(0, 100, "Connection!");
-    printf("SEND REBOOT\n");
-    while (total_e < 10)
-    {
-        if(reboot_seq() != ERR_OK)
-        {
-            total_e++;
-            usleep(2000000);//wait 2 seconds gimbal reboot.
-            printf("REBOOT FAIL\n");
-        }else
-        {
-            break;
-        }
-        
-    }
-    if (total_e >= 10)
-    {
-        return false;
-    }
-    _gimbal.sysid = 1;
-    has_detected = false;
-    total_e = 0;
+
     while (1)
     {
         uint64_t time  = lastest_timeslap_heartbeat();
@@ -147,6 +129,21 @@ bool BootloaderMavlink::run()
 
         switch (state)
         {
+        case SEND_REBOOT:
+        {
+            update_status_bar(0, 100, "Send Reboot!");
+            if(reboot_seq() == ERR_OK)
+            {
+                total_e = 0; // reset error
+                state = CONNECT;
+            }
+            else
+            {
+                total_e++;
+                usleep(1000000);//wait 1 seconds gimbal reboot.
+            }
+        }
+            break;
         case CONNECT:
         {
             update_status_bar(0, 100, "Set baudrate!");
@@ -163,10 +160,7 @@ bool BootloaderMavlink::run()
             }
             else
             {
-
-                // state = TRANSMIT;
                 total_e++;
-                // return false;
             }
             
         }
@@ -174,7 +168,7 @@ bool BootloaderMavlink::run()
         case SETBAUD:
         {
             _serial_port->stop();
-            _serial_port->baudrate = 115200;
+            _serial_port->baudrate = expect_baudrate;
             _serial_port->start();
             has_detected = false;
             state = WAIT_SETBAUD;
@@ -245,9 +239,8 @@ void  BootloaderMavlink::w_heartbeat()
     // --------------------------------------------------------------------------
     //   WRITE
     // --------------------------------------------------------------------------
-    printf("Send HEARTBEAT\n");
     if (w_message(message) <= 0)
-        printf("WARNING: could not send HEARTBEAT\n");
+    GSDK_DebugError("WARNING: could not send HEARTBEAT\n");
 
 }
 bool  BootloaderMavlink::w_serial_control_sync(const mavlink_serial_control_t &srl_send, mavlink_serial_control_t &srl_receive)
@@ -278,13 +271,11 @@ bool  BootloaderMavlink::w_ftp_sync(const PayloadHeader &ftp_send, PayloadHeader
 {
     mavlink_message_t message = { 0 };
     const uint8_t * data = reinterpret_cast<const uint8_t*>(&ftp_send);
-    printf("Send data -----------------------\n");
-    printf("seq_number : %u\n",ftp_send.seq_number);
-    printf("session : %u\n",ftp_send.session);
-    printf("OP code : %u\n",ftp_send.opcode);
-    printf("Data[0] : %u\n",data[0]);
-    printf("Data[1] : %u\n",data[1]);
-    printf("Data[2] : %u\n",data[2]);
+
+    GSDK_DebugMsg("Send data --------------------------\n");
+    GSDK_DebugMsg("seq_number : %u\n",ftp_send.seq_number);
+    GSDK_DebugMsg("session : %u\n",ftp_send.session);
+    GSDK_DebugMsg("OP code : %u\n",ftp_send.opcode);
 
     mavlink_msg_file_transfer_protocol_pack_chan(
                                                 _system.sysid, 
@@ -309,17 +300,13 @@ bool  BootloaderMavlink::w_ftp_sync(const PayloadHeader &ftp_send, PayloadHeader
         {
             result = true;
             memcpy((&ftp_receive) , &_messages.ftp.payload[0] , sizeof(PayloadHeader));
-            printf("receive data -----------------------\n");
-            printf("Payload[0] : %u\n",_messages.ftp.payload[0]);
-            printf("Payload[1] : %u\n",_messages.ftp.payload[1]);
-            printf("Payload[2] : %u\n",_messages.ftp.payload[2]);
-            printf("Payload[5] : %u\n",_messages.ftp.payload[5]);
-            printf("seq_number : %u\n",ftp_receive.seq_number);
-            printf("session : %u\n",ftp_receive.session);
-            printf("OP code : %u\n",ftp_receive.opcode);
+            GSDK_DebugMsg("Receive data -----------------------\n");
+            GSDK_DebugMsg("seq_number : %u\n",ftp_receive.seq_number);
+            GSDK_DebugMsg("session : %u\n",ftp_receive.session);
+            GSDK_DebugMsg("OP code : %u\n",ftp_receive.opcode);
         }else
         {
-            printf("Wrong ID\n");
+            GSDK_DebugError("Wrong ID\n");
         }
         
     }else
@@ -373,16 +360,16 @@ BootloaderMavlink::err_t BootloaderMavlink::reboot_seq()
     cmd_long.param4  = expect_compid;
     cmd_long.target_component = expect_compid;
     cmd_long.target_system = _gimbal.sysid;
-    printf("Send reboot, sys : %u, comp: %u\n", _gimbal.sysid ,expect_compid);
+    GSDK_DebugMsg("Send reboot, sys : %u, comp: %u\n", _gimbal.sysid ,expect_compid);
     if(!w_reboot_sync(cmd_long, cmd_ack))
     {
-        printf("Reboot Time out: %u\n",cmd_ack.result);
+        GSDK_DebugError("Reboot Time out: %u\n",cmd_ack.result);
         return ERR_TIMEOUT;
     } 
 
     if (cmd_ack.result != 0)
     {
-        printf("Reboot NACK: %u\n",cmd_ack.result);
+        GSDK_DebugError("Reboot NACK: %u\n",cmd_ack.result);
         return ERR_NACK;
     }
     return ERR_OK;
@@ -393,7 +380,7 @@ BootloaderMavlink::err_t BootloaderMavlink::connect_seq()
     srl.device = SERIAL_CONTROL_SERIAL0;
     srl.flags = SERIAL_CONTROL_FLAG_RESPOND;
     srl.timeout = 1000; // timeout 1s
-    srl.baudrate = 115200;
+    srl.baudrate = expect_baudrate;
     srl.count = 0;
     srl.target_system = _gimbal.sysid;
     srl.target_component = _gimbal.compid;
@@ -442,6 +429,8 @@ BootloaderMavlink::err_t BootloaderMavlink::parse_bin_and_send_seq()
             FirmwareInfo            fw_info{0};
             fw_info.total_size = total_size;
             fw_info.crc32 = gremsy_crc32();
+            gremsy_version(&fw_info.x, &fw_info.y, &fw_info.z);
+            GSDK_DebugMsg("Firmware version: %u.%u.%u\n",fw_info.x, fw_info.y, fw_info.z);
             memcpy(&ftp_rq.data[0],&fw_info,sizeof(FirmwareInfo));
             ftp_rq.burst_complete   = 0;
             ftp_rq.offset           = 0;
@@ -454,7 +443,7 @@ BootloaderMavlink::err_t BootloaderMavlink::parse_bin_and_send_seq()
 
             if (ftp_rs.opcode != Opcode::RSP_ACK || ftp_rs.seq_number != ftp_rq.seq_number)
             {
-                printf("Oh, wrong OP CODE %u - req opcode : %u\n",ftp_rs.req_opcode,ftp_rs.req_opcode);
+                GSDK_DebugMsg("Oh, wrong OP CODE %u - req opcode : %u\n",ftp_rs.req_opcode,ftp_rs.req_opcode);
                 err ++;
                 break;
             }
@@ -571,7 +560,7 @@ void BootloaderMavlink::read_thread(void)
     mavlink_message_t message     = { 0 };
     mavlink_status_t mav_status;
     if (_serial_port == nullptr) {
-        printf("ERROR: serial port not exist\n");
+        GSDK_DebugMsg("ERROR: serial port not exist\n");
         throw 1;
     }
     while (!time_to_exit) {
@@ -617,12 +606,6 @@ void  BootloaderMavlink::write_thread(void)
         {
             have_message = false;
             uint16_t len = _serial_port->write_message(message);
-            if(len <= 0)
-            {
-            printf("#################################\n");
-            printf("send heart beat ERRRRRRRRRRRRR \n");
-            printf("#################################\n");
-            }
         }
 
         usleep(1000);
@@ -655,14 +638,11 @@ void BootloaderMavlink::messages_handler(const mavlink_message_t &message)
         {
         case MAVLINK_MSG_ID_HEARTBEAT: 
         {
-            printf("Got heartbeat\n");
             pthread_mutex_lock(&_messages.mutex);
             mavlink_msg_heartbeat_decode(&message, &_messages.heartbeat);
             if (message.compid == expect_compid)
             {
                 // Store message sysid and compid.
-                printf("Got heartbeat from compid: %u\n",message.compid);
-                printf("Got heartbeat from sysid: %u\n",message.sysid);
                 _gimbal.sysid  = message.sysid;
                 _gimbal.compid = message.compid;
                 has_detected = true;
@@ -689,7 +669,6 @@ void BootloaderMavlink::messages_handler(const mavlink_message_t &message)
         break;
         case MAVLINK_MSG_ID_COMMAND_ACK:
         {
-            printf("GOT ACK!\n");
             pthread_mutex_lock(&_messages.mutex_cmd_ack);
             mavlink_msg_command_ack_decode(&message, &_messages.cmd_ack);
             pthread_cond_signal(&_messages._condition_cmd_ack);

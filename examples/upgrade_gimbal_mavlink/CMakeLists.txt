@@ -1,12 +1,20 @@
+project(upgrade_gimbal_mavlink)
 cmake_minimum_required(VERSION 3.15)
 
 # Specify at least C++11, better C++17
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+set(MAVLINK_INCLUDES
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../src/mavlink/include/mavlink/v2.0")
+
+set(MAVLINK_SRC
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../src")
+
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}
-                    ${CMAKE_CURRENT_SOURCE_DIR}/src/parsers
+                    ${CMAKE_CURRENT_SOURCE_DIR}/../../src/parsers
                     ${MAVLINK_INCLUDES}
+                    ${MAVLINK_SRC}
                     )
 
 include(FetchContent)
@@ -27,6 +35,7 @@ set(UPGRADE_GIMBAL_MAVLINK_SRC
 add_executable(upgrade_gimbal_mavlink ${UPGRADE_GIMBAL_MAVLINK_SRC})
 
 find_package( Threads )
+
 target_link_libraries(upgrade_gimbal_mavlink
                     ${CMAKE_THREAD_LIBS_INIT}
                     nlohmann_json::nlohmann_json

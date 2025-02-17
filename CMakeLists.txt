@@ -32,22 +32,14 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}
 set(GSDK_APP_SRC
     mavlink_control.cpp
     ${MAVLINK_SRC}/parsers/utils.cpp
-    ${MAVLINK_SRC}/parsers/binary.c
-    ${MAVLINK_SRC}/parsers/crc32.c
-    ${MAVLINK_SRC}/parsers/parse.cpp
     ${MAVLINK_SRC}/bootloader.cpp
-    ${MAVLINK_SRC}/bootloader_mavlink.cpp
     ${MAVLINK_SRC}/gimbal_interface.cpp
     ${MAVLINK_SRC}/gimbal_protocol.cpp
     ${MAVLINK_SRC}/gimbal_protocol_v1.cpp
     ${MAVLINK_SRC}/gimbal_protocol_v2.cpp
     ${MAVLINK_SRC}/serial_port.cpp
 )
-include(FetchContent)
-FetchContent_Declare(
-                    json
-                    URL https://github.com/nlohmann/json/releases/download/v3.11.3/json.tar.xz
-                    )
+
 
                     
 add_executable(gSDK ${GSDK_APP_SRC})
@@ -55,11 +47,10 @@ add_executable(gSDK ${GSDK_APP_SRC})
 find_package( Threads )
 target_link_libraries(gSDK
                       ${CMAKE_THREAD_LIBS_INIT}
-                      nlohmann_json::nlohmann_json
                       )
 
 #install(TARGETS
 #        gSDK
 #        RUNTIME DESTINATION usr/bin/gSDK)
 
-add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/examples")
+# add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/examples")

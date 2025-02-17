@@ -57,6 +57,14 @@ bool            gremsy_open(std::string filename)
     } catch (std::exception &e) {
         return false;
     }
+
+    if (!json_data->contains("description") ) {
+        return false;
+    }
+    std::string description = json_data->at("description").get<std::string>();
+    if (description != "Gremsy") {
+        return false;
+    }
     return true;
 }
 
@@ -83,12 +91,13 @@ bool            gremsy_version(uint8_t *x, uint8_t *y, uint8_t *z)
     }
     else
     {
-        // if (!json_data->contains("version") ) {
-        //     return 0;
-        // }
-        // *x = (*json_data)["version"]["x"];
-        // *y = (*json_data)["version"]["y"];
-        // *z = (*json_data)["version"]["z"];
+        if (!json_data->contains("version") ) {
+            return 0;
+        }
+        uint16_t version = json_data->at("version").get<uint16_t>();
+        *z = version % 10;
+        *y = (version / 10) % 10;
+        *x = (version / 100) % 10;
     }
 }
 
