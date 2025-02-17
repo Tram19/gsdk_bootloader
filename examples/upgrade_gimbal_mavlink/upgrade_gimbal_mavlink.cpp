@@ -1,5 +1,4 @@
 #include "upgrade_gimbal_mavlink.h"
-#include "gimbal_protocol.h"
 #include <iostream>
 #include <chrono>
 #include <thread>
@@ -70,7 +69,7 @@ void parse_commandline(int argc, char **argv, char *&uart_name, int &baudrate, s
 
     if (path == "")
     {
-        GSDK_DebugError("A path is required\n");
+        printf("A path is required\n");
         printf("%s\n", commandline_usage);
         throw EXIT_FAILURE;
     }
@@ -103,8 +102,14 @@ int main(int argc, char **argv)
     BootloaderMavlink boot_loader(&serial_port, path, expect_compid);
 
     //FLASH CODE
-    boot_loader.init();
-    boot_loader.run();
+    if(boot_loader.init())
+    {
+        boot_loader.run();
+    }
+    else
+    {
+        printf("Bootloader Mavlink init failed!\n");
+    }
 
     return 1;
 }
