@@ -104,21 +104,18 @@ parser = argparse.ArgumentParser(description="Firmware generator.")
 parser.add_argument("--gimbal_id", action="store", help="set the gimbal ID required")
 parser.add_argument("--gimbal_name", action="store", help="set the gimbal ID required")
 parser.add_argument("--version", action="store", help="set a version string")
-parser.add_argument("--description", action="store", help="set a longer description")
 parser.add_argument("--image", action="store", help="the firmware image")
 args = parser.parse_args()
 
 desc = mkdesc()
 desc['build_time'] = int(time.time())
-
+desc['description'] = "Gremsy"
 if args.gimbal_id is not None:
     desc['gimbal_id'] = int(args.gimbal_id)
 if args.gimbal_name is not None:
     desc['gimbal_name'] = str(args.gimbal_name)
 if args.version is not None:
     desc['version'] = int(args.version)
-if args.description is not None:
-    desc['description'] = str(args.description)
 if args.image is not None:
     with open(args.image, "rb") as f:
         data = f.read()
