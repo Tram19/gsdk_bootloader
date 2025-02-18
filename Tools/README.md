@@ -18,7 +18,7 @@
 ```
 python gremsy_mkfw.py --gimbal_id <gimbal_id> --gimbal_name <gimbal_name> --version <version> --image <firmware_path>
 ```
-## Cách Sử Dụng
+## Ví Dụ
 
 Giả sử có firmware tại đường dẫn /FW/gremsyZio_v785_Beta_boot_compatible.bin và muốn tạo file image cho gimbal có:
 
