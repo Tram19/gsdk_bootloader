@@ -119,10 +119,11 @@ bool BootloaderMavlink::run()
         uint64_t time  = lastest_timeslap_heartbeat();
         if (time > 20000)
         {
+            GSDK_DebugError("Cannot communication!\n");
             update_status_bar(0, 100, "Cannot communication!");
             return false;
         }
-        else if((time < 20000 && time > 3000) || !has_detected)
+        else if((time < 20000) || !has_detected)
         {
             continue;
         }
@@ -184,6 +185,7 @@ bool BootloaderMavlink::run()
             update_status_bar(0, 100, "Flash Firmware!");
             if(parse_bin_and_send_seq() == ERR_OK)
             {
+                GSDK_DebugSuccess("Code flashed successfully!");
                 return true;
             }            
             else
@@ -490,9 +492,6 @@ BootloaderMavlink::err_t BootloaderMavlink::parse_bin_and_send_seq()
                 offset += ftp_rq.size;
                 ftp_rq.seq_number++;
                 write_state = PASER;
-                progess = (int)(offset * 100 / total_size);
-                update_status_bar(progess, 100, "Flash Firmware!");
-                // printf("---------------\n");
             }
                 break;
             default:
