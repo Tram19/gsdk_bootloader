@@ -104,7 +104,10 @@ int main(int argc, char **argv)
     //FLASH CODE
     if(boot_loader.init())
     {
-        boot_loader.run();
+        if(!boot_loader.run())
+        {
+            // TODO: Handle error
+        }
     }
     else
     {

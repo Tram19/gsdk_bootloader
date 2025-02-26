@@ -8,33 +8,8 @@ uint32_t start_time;
 // ----------------------------------------------------------------------------------
 //   Time
 // ------------------- ---------------------------------------------------------------
-int progess = 0;
-void update_status_bar(int progress, int total, const std::string& status) {
-    return;
-    if (progress <= 0) progress = 0;
-    
-    int bar_width = 50;
-    float percent = (float)progress / total;
-    int pos = bar_width * percent;
-    std::cout << "\r" << std::string(100, ' ') << "\r"; 
-    std::cout << "[";
-    for (int i = 0; i < bar_width; ++i) {
-        if (i < pos) std::cout << "=";
-        else if (i == pos) std::cout << ">";
-        else std::cout << " ";
-    }
 
-    if (percent >= 100)
-    {
-        percent = 100;
-        std::cout<< "\33[92m" << "] " << int(percent * 100.0) << "% " << status << "\033[0m" <<"\r";
-    }
-    else{
-        std::cout << "] " << int(percent * 100.0) << "% " << status << "\r";
-    }
-    
-    std::cout.flush();
-}
+
 static uint64_t get_time_usec()
 {
     static struct timeval _timestamp;
@@ -63,8 +38,6 @@ BootloaderMavlink::BootloaderMavlink(Serial_Port *serial_port , string path, uin
 BootloaderMavlink::~BootloaderMavlink()
 {
     time_to_exit = true;
-    this -> _serial_port->close_serial();
-    this -> _serial_port = NULL;
     close();
 }
 
@@ -87,7 +60,9 @@ bool BootloaderMavlink::init()
         GSDK_DebugError("Cannot open file %s\n", path.c_str());
         return false;
     }
-    std::cout << "Crc32: " << gremsy_crc32() << endl;
+    GSDK_DebugInfo("Crc32: %d\n", gremsy_crc32());
+    GSDK_DebugInfo("Size: %d\n", gremsy_size());
+
     init_flag = true;
     start_time = get_time_msec();
     timeslap_hb = get_time_msec();
@@ -101,6 +76,7 @@ bool BootloaderMavlink::close()
         pthread_cancel(read_tid);
         pthread_cancel(write_tid);
         gremsy_close();
+        _serial_port->close_serial();
     }
     return true;
 }
@@ -112,7 +88,7 @@ bool BootloaderMavlink::run()
         return false;
     }
     uint8_t total_e = 0;
-    update_status_bar(0, 100, "Connection!");
+
 
     while (1)
     {
@@ -121,7 +97,6 @@ bool BootloaderMavlink::run()
         if (time > 20000)
         {
             GSDK_DebugError("Cannot communication!\n");
-            update_status_bar(0, 100, "Cannot communication!");
             return false;
         }
         else if((time < 20000) && !has_detected)
@@ -135,7 +110,6 @@ bool BootloaderMavlink::run()
         {
         case SEND_REBOOT:
         {
-            update_status_bar(0, 100, "Send Reboot!");
             if(reboot_seq() == ERR_OK)
             {
                 total_e = 0; // reset error
@@ -150,7 +124,7 @@ bool BootloaderMavlink::run()
             break;
         case CONNECT:
         {
-            update_status_bar(0, 100, "Set baudrate!");
+
             err_t result = connect_seq();
             if (result == ERR_OK)
             {
@@ -185,7 +159,7 @@ bool BootloaderMavlink::run()
             break;
         case TRANSMIT:
         {
-            update_status_bar(0, 100, "Flash Firmware!");
+
             if(parse_bin_and_send_seq() == ERR_OK)
             {
                 GSDK_DebugSuccess("Code flashed successfully!");
@@ -193,7 +167,7 @@ bool BootloaderMavlink::run()
             }            
             else
             {
-                update_status_bar(progess, 100, "Flash Firmware Failed!");
+
                 return false;
             }
         }
@@ -204,7 +178,7 @@ bool BootloaderMavlink::run()
         
         if (total_e >= 10)
         {
-            update_status_bar(progess, 100, "Flash Firmware Failed!");
+            GSDK_DebugError("Code flash failed!\n");
             return false;
         }
         
@@ -228,7 +202,7 @@ bool BootloaderMavlink::w_message(const mavlink_message_t &message)
 }
 void  BootloaderMavlink::w_heartbeat()
 {
-    printf("Send heartbeat\n");
+
     mavlink_heartbeat_t heartbeat = { 0 };
     heartbeat.type 			= MAV_TYPE_ONBOARD_CONTROLLER;
     heartbeat.autopilot 	= MAV_AUTOPILOT_ARDUPILOTMEGA;
@@ -296,8 +270,8 @@ bool  BootloaderMavlink::w_ftp_sync(const PayloadHeader &ftp_send, PayloadHeader
     int rt = 0;
     bool result = false;
     clock_gettime(CLOCK_REALTIME, &time_wait);
-    // Wait for 1 sec timeout
-    time_wait.tv_sec += 1;
+    // Wait for 5 sec timeout
+    time_wait.tv_sec += 5;
     w_message(message);
     pthread_mutex_lock(&_messages.mutex_ftp);
     rt = pthread_cond_timedwait(&_messages._condition_ftp, &_messages.mutex_ftp, &time_wait);
@@ -435,6 +409,7 @@ BootloaderMavlink::err_t BootloaderMavlink::parse_bin_and_send_seq()
             FirmwareInfo            fw_info{0};
             fw_info.total_size = total_size;
             fw_info.crc32 = gremsy_crc32();
+            
             gremsy_version(fw_info.x, fw_info.y, fw_info.z);
             GSDK_DebugMsg("Firmware version: %u.%u.%u\n",fw_info.x, fw_info.y, fw_info.z);
             memcpy(&ftp_rq.data[0],&fw_info,sizeof(FirmwareInfo));
@@ -449,7 +424,7 @@ BootloaderMavlink::err_t BootloaderMavlink::parse_bin_and_send_seq()
 
             if (ftp_rs.opcode != Opcode::RSP_ACK || ftp_rs.seq_number != ftp_rq.seq_number)
             {
-                GSDK_DebugMsg("Oh, wrong OP CODE %u - req opcode : %u\n",ftp_rs.req_opcode,ftp_rs.req_opcode);
+                GSDK_DebugError("Oh, wrong at req opcode : %u -  OP CODE : %u\n",ftp_rs.seq_number,ftp_rs.opcode);
                 err ++;
                 break;
             }
@@ -484,12 +459,14 @@ BootloaderMavlink::err_t BootloaderMavlink::parse_bin_and_send_seq()
                 ftp_rq.offset =         offset;
                 if(!w_ftp_sync(ftp_rq, ftp_rs))  
                 {
+                    GSDK_DebugError("Time out in send fw step\n");
                     err ++;
                     break;
                 }
 
                 if (ftp_rs.opcode != Opcode::RSP_ACK || ftp_rs.seq_number != ftp_rq.seq_number)
                 {
+                    GSDK_DebugError("Oh, wrong at req opcode : %u -  OP CODE : %u\n",ftp_rs.seq_number,ftp_rs.opcode);
                     err ++;
                     break;
                 }
@@ -517,17 +494,19 @@ BootloaderMavlink::err_t BootloaderMavlink::parse_bin_and_send_seq()
             ftp_rq.size             = 0;
             if(!w_ftp_sync(ftp_rq, ftp_rs))  
             {
+                GSDK_DebugError("Time out in send fw step\n");
                 err ++;
                 break;
             }
 
             if (ftp_rs.opcode != Opcode::RSP_ACK || ftp_rs.seq_number != ftp_rq.seq_number)
             {
+                GSDK_DebugError("Oh, wrong at req opcode : %u -  OP CODE : %u\n",ftp_rs.seq_number,ftp_rs.opcode);
                 err ++;
                 break;
             }
             ftp_rq.seq_number++;
-            update_status_bar(100, 100, "Flash FW Success!");
+
             return ERR_OK;
         }
             break;
@@ -537,6 +516,7 @@ BootloaderMavlink::err_t BootloaderMavlink::parse_bin_and_send_seq()
         
         if (err > 5)
         {
+            GSDK_DebugError("Too many error\n");
             return ERR_UNKNOWN;
         }
         usleep(10000);
@@ -647,8 +627,6 @@ void BootloaderMavlink::messages_handler(const mavlink_message_t &message)
             if (message.compid == expect_compid)
             {
                 // Store message sysid and compid.
-                printf("Sysid: %u\n" ,message.sysid);
-                printf("Compid: %u\n" ,message.compid);
                 _gimbal.sysid  = message.sysid;
                 _gimbal.compid = message.compid;
                 has_detected = true;
