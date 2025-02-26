@@ -87,7 +87,7 @@ bool BootloaderMavlink::init()
         GSDK_DebugError("Cannot open file %s\n", path.c_str());
         return false;
     }
-
+    std::cout << "Crc32: " << gremsy_crc32() << endl;
     init_flag = true;
     start_time = get_time_msec();
     timeslap_hb = get_time_msec();
@@ -116,6 +116,7 @@ bool BootloaderMavlink::run()
 
     while (1)
     {
+
         uint64_t time  = lastest_timeslap_heartbeat();
         if (time > 20000)
         {
@@ -123,8 +124,10 @@ bool BootloaderMavlink::run()
             update_status_bar(0, 100, "Cannot communication!");
             return false;
         }
-        else if((time < 20000) || !has_detected)
+        else if((time < 20000) && !has_detected)
         {
+
+            sleep(1);
             continue;
         }
 
@@ -638,11 +641,14 @@ void BootloaderMavlink::messages_handler(const mavlink_message_t &message)
         {
         case MAVLINK_MSG_ID_HEARTBEAT: 
         {
+
             pthread_mutex_lock(&_messages.mutex);
             mavlink_msg_heartbeat_decode(&message, &_messages.heartbeat);
             if (message.compid == expect_compid)
             {
                 // Store message sysid and compid.
+                printf("Sysid: %u\n" ,message.sysid);
+                printf("Compid: %u\n" ,message.compid);
                 _gimbal.sysid  = message.sysid;
                 _gimbal.compid = message.compid;
                 has_detected = true;

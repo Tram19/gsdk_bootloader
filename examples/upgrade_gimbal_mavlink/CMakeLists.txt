@@ -1,5 +1,5 @@
-project(upgrade_gimbal_mavlink)
 cmake_minimum_required(VERSION 3.15)
+project(upgrade_gimbal_mavlink)
 
 # Specify at least C++11, better C++17
 set(CMAKE_CXX_STANDARD 17)
