@@ -225,6 +225,7 @@ bool BootloaderMavlink::w_message(const mavlink_message_t &message)
 }
 void  BootloaderMavlink::w_heartbeat()
 {
+    printf("Send heartbeat\n");
     mavlink_heartbeat_t heartbeat = { 0 };
     heartbeat.type 			= MAV_TYPE_ONBOARD_CONTROLLER;
     heartbeat.autopilot 	= MAV_AUTOPILOT_ARDUPILOTMEGA;
@@ -431,7 +432,7 @@ BootloaderMavlink::err_t BootloaderMavlink::parse_bin_and_send_seq()
             FirmwareInfo            fw_info{0};
             fw_info.total_size = total_size;
             fw_info.crc32 = gremsy_crc32();
-            gremsy_version(&fw_info.x, &fw_info.y, &fw_info.z);
+            gremsy_version(fw_info.x, fw_info.y, fw_info.z);
             GSDK_DebugMsg("Firmware version: %u.%u.%u\n",fw_info.x, fw_info.y, fw_info.z);
             memcpy(&ftp_rq.data[0],&fw_info,sizeof(FirmwareInfo));
             ftp_rq.burst_complete   = 0;

@@ -1,118 +1,74 @@
 #include "parse.h"
 
-using json = nlohmann::json;
+static Json::Value root;
 
-json * json_data;
 
-std::vector<unsigned char> hexStringToBytes(std::string hex) {
-    std::vector<unsigned char> bytes;
-    
-    // Nếu chuỗi có khoảng trắng, loại bỏ chúng:
-    hex.erase(std::remove_if(hex.begin(), hex.end(), ::isspace), hex.end());
-    
-    // Nếu độ dài không chẵn, bạn có thể padding thêm '0' ở đầu hoặc xử lý theo yêu cầu:
-    if (hex.length() % 2 != 0) {
-        hex = "0" + hex;
+bool gremsy_open(const std::string& filename) {
+    std::ifstream file(filename, std::ios::binary);
+    if (!file.is_open()) {
+        std::cerr << "Cannot open JSON file: " << filename << std::endl;
+        return false;
     }
-    
+    Json::CharReaderBuilder builder;
+    builder["collectComments"] = false;
+    std::string errs;
+    bool ok = Json::parseFromStream(builder, file, &root, &errs);
+    file.close();
+    if (!ok) {
+        std::cerr << "Failed to parse JSON: " << errs << std::endl;
+        return false;
+    }
+    return true;
+}
+
+unsigned int gremsy_size() {
+    if (!root.isMember("image_size") || !root["image_size"].isUInt()) {
+        return 0;
+    }
+    return root["image_size"].asUInt();
+}
+
+
+std::vector<unsigned char> hexStringToBytes(const std::string& hex) {
+    std::vector<unsigned char> bytes;
+    bytes.reserve(hex.size() / 2);
     for (size_t i = 0; i < hex.length(); i += 2) {
-        std::string byteString = hex.substr(i, 2);
-        unsigned char byte = static_cast<unsigned char>(std::stoul(byteString, nullptr, 16));
+        std::string byteStr = hex.substr(i, 2);
+        unsigned char byte = static_cast<unsigned char>(strtol(byteStr.c_str(), nullptr, 16));
         bytes.push_back(byte);
     }
     return bytes;
 }
 
-unsigned int    gremsy_size()
-{
-    if (json_data == NULL)
-    {
-        return 0;
-    }
-    else
-    {
-        if (!json_data->contains("image_size") ) {
-            return 0;
-        }
-        return json_data->at("image_size").get<uint32_t>();
-    }
-    
-}
 
-bool            gremsy_close()
-{
-    delete json_data;
-    return true;
-}
-
-bool            gremsy_open(std::string filename)
-{
-    json_data = new json();
-    std::ifstream i(filename);
-    if (!i.is_open()) {
-        return false;
-    }
-    try {
-        i >> *json_data;
-    } catch (std::exception &e) {
-        return false;
-    }
-
-    if (!json_data->contains("description") ) {
-        return false;
-    }
-    std::string description = json_data->at("description").get<std::string>();
-    if (description != "Gremsy") {
-        return false;
-    }
-    return true;
-}
-
-std::vector<unsigned char> gremsy_read()
-{
-    if (json_data == NULL)
-    {
+std::vector<unsigned char> gremsy_read() {
+    if (!root.isMember("image") || !root["image"].isString()) {
         return std::vector<unsigned char>();
     }
-    else
-    {
-        if (!json_data->contains("image") ) {
-            return std::vector<unsigned char>();
-        }
-        return hexStringToBytes(json_data->at("image").get<std::string>());
-    }
+    return hexStringToBytes(root["image"].asString());
 }
 
-bool            gremsy_version(uint8_t *x, uint8_t *y, uint8_t *z)
-{
-    if (json_data == NULL)
-    {
-        return 0;
+
+bool gremsy_version(uint8_t &x, uint8_t &y, uint8_t &z) {
+    if (!root.isMember("version") || !root["version"].isInt()) {
+        return false;
     }
-    else
-    {
-        if (!json_data->contains("version") ) {
-            return 0;
-        }
-        uint16_t version = json_data->at("version").get<uint16_t>();
-        *z = version % 10;
-        *y = (version / 10) % 10;
-        *x = (version / 100) % 10;
-    }
+    int version = root["version"].asInt();
+    z = version % 10;
+    y = (version / 10) % 10;
+    x = (version / 100) % 10;
+    return true;
 }
 
-uint32_t            gremsy_crc32()
-{
-    if (json_data == NULL)
-    {
-        return 0;
-    }
-    else
-    {
-        if (!json_data->contains("crc32") ) {
-            return 0;
-        }
-        return json_data->at("crc32").get<uint32_t>();
 
+uint32_t gremsy_crc32() {
+    if (!root.isMember("crc32") || !root["crc32"].isUInt()) {
+        return false;
     }
+    return static_cast<uint32_t>(root["crc32"].asUInt64());
+}
+
+
+void gremsy_close() {
+    root.clear();
 }

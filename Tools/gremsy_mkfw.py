@@ -91,7 +91,8 @@ def mkdesc():
     proto = {}
     proto['gimbal_id']    = 0
     proto['gimbal_name'] = ""
-    proto['version']     = ""
+    proto['version']     = 0
+    proto['version_footer']     = ""
     proto['description'] = ""
     proto['build_time']  = 0
     proto['image']       = ""   # Nếu bạn có dữ liệu nhị phân, hãy chuyển nó thành chuỗi (ví dụ: dùng latin1 hoặc base64)
@@ -104,12 +105,15 @@ parser = argparse.ArgumentParser(description="Firmware generator.")
 parser.add_argument("--gimbal_id", action="store", help="set the gimbal ID required")
 parser.add_argument("--gimbal_name", action="store", help="set the gimbal ID required")
 parser.add_argument("--version", action="store", help="set a version string")
+parser.add_argument("--version_footer", action="store", help="set a version string")
 parser.add_argument("--image", action="store", help="the firmware image")
 args = parser.parse_args()
 
 desc = mkdesc()
 desc['build_time'] = int(time.time())
 desc['description'] = "Gremsy"
+if args.version_footer is not None:
+    desc['version_footer'] = str(args.version_footer)
 if args.gimbal_id is not None:
     desc['gimbal_id'] = int(args.gimbal_id)
 if args.gimbal_name is not None:
@@ -127,7 +131,7 @@ if args.image is not None:
     desc['crc32'] = xcrc32(data, 0xffffffff)
 
 
-output_file = (f"gremsy{desc['gimbal_name']}_v{desc['version']}.gremsy")
+output_file = (f"gremsy{desc['gimbal_name']}_v{desc['version']}_{desc['version_footer']}.gremsy")
 with open(output_file, "w") as f:
     f.write(json.dumps(desc, indent=4))
 

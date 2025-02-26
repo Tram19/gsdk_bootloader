@@ -17,12 +17,8 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}
                     ${MAVLINK_SRC}
                     )
 
-include(FetchContent)
-FetchContent_Declare(
-                    json
-                    URL https://github.com/nlohmann/json/releases/download/v3.11.3/json.tar.xz
-                    )
-FetchContent_MakeAvailable(json)
+
+
 set(UPGRADE_GIMBAL_MAVLINK_SRC
     upgrade_gimbal_mavlink.cpp
     ${MAVLINK_SRC}/parsers/utils.cpp
@@ -35,8 +31,9 @@ set(UPGRADE_GIMBAL_MAVLINK_SRC
 add_executable(upgrade_gimbal_mavlink ${UPGRADE_GIMBAL_MAVLINK_SRC})
 
 find_package( Threads )
+find_package(jsoncpp CONFIG REQUIRED)
 
 target_link_libraries(upgrade_gimbal_mavlink
+                    jsoncpp_lib
                     ${CMAKE_THREAD_LIBS_INIT}
-                    nlohmann_json::nlohmann_json
                     )
