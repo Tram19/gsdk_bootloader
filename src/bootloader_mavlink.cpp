@@ -113,6 +113,7 @@ bool BootloaderMavlink::run()
             if(reboot_seq() == ERR_OK)
             {
                 total_e = 0; // reset error
+                set_progress(0);
                 state = CONNECT;
             }
             else
@@ -326,7 +327,7 @@ bool  BootloaderMavlink::w_reboot_sync(const mavlink_command_long_t &cmdlong, ma
     {
         // printf("Timeout reboot!\n\n");
     }
-    
+
     pthread_mutex_unlock(&_messages.mutex_cmd_ack);
     return result;
 }
@@ -473,6 +474,8 @@ BootloaderMavlink::err_t BootloaderMavlink::parse_bin_and_send_seq()
                 offset += ftp_rq.size;
                 ftp_rq.seq_number++;
                 write_state = PASER;
+
+                set_progress(static_cast<int>((offset * 100) / total_size));
             }
                 break;
             default:

@@ -8,6 +8,7 @@
 #include <sys/time.h>
 #include <queue>
 #include "parse.h"
+#include <mutex>
 
 // As found in
 // https://stackoverflow.com/questions/1537964#answer-3312896
@@ -112,6 +113,13 @@ public:
     void start_write_thread(void);
     bool is_gimbal(uint8_t compid);
 
+    virtual int get_progress() { std::lock_guard<std::mutex> lock(progress_mtx); 
+                                 return progress; };
+    virtual void set_progress(int p) {  std::lock_guard<std::mutex> lock(progress_mtx);  
+                                        if (p > 100) p = 100;
+                                        if (p < 0) p = 0;
+                                        GSDK_DebugInfo("Progress: %d\n", p);
+                                        progress = p; };
 private:
     enum State : uint8_t{
         SEND_REBOOT,
@@ -188,6 +196,8 @@ private:
     mavlink_system_t    _system{240,250};
     mavlink_system_t    _gimbal{};
     uint64_t            timeslap_hb {0};
+    int                 progress{0};
+    std::mutex          progress_mtx;
     uint8_t expect_compid{0};
     int expect_baudrate {115200};
 
