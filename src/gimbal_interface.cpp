@@ -1741,7 +1741,6 @@ void Gimbal_Interface::write_heartbeat(void)
 void Gimbal_Interface::start()
 {
 
-    usleep(20000000); // wait for 1s to let the port start
     time_to_exit = false;
     int result = 0;
 
