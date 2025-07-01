@@ -24,6 +24,8 @@ const int NUM_BYTES_IN_PAGE_HD          = 2048;     //2kb
 const int NUM_BYTES_IN_PAGE_F2          = 16384;    //16kb
 const int NUM_BYTES_IN_PAGE_H7          = 128*1024; //128kb
 const int NUM_BYTES_IN_PAGE_F4_CUSTOM   = 128*1024; //128Kb
+const int NUM_BYTES_IN_PAGE_L0          = 128;      //128b
+
 /// SECTOR                                0           1           2           3           4           5           6           7           8           9           10          11
 static const int F4_MAP[]             = { 16,        16,         16,         16,         64,         128,        128,        128,        128,        128,        128,        128 };
 static const uint64_t F4_SECTOR_END_MAP [] = { 0X08003FFF, 0X08007FFF, 0X0800BFFF, 0X0800FFFF, 0X0801FFFF, 0X0803FFFF, 0X0805FFFF, 0X0807FFFF, 0X0809FFFF, 0X080BFFFF, 0X080DFFFF, 0X080FFFFF, };
@@ -319,7 +321,7 @@ Boot_loader::err_t Boot_loader::send_get_id_seq()
         GSDK_DebugInfo("Device ID: 0x%03x", pid);
     }
 
-    for (size_t i = 0; i < 7; i++)  // MAX DEVICES
+    for (size_t i = 0; i < COUNT; i++)  // MAX DEVICES
     {
         if (devices[i].ID == pid)
         {
@@ -493,6 +495,10 @@ int Boot_loader::erase_page_get()
                 return i - 4;
             }
         }
+    }
+    else if (device->ID == devices[(int)L031X].ID)
+    {
+        return (int)(binArraySize / NUM_BYTES_IN_PAGE_L0) + 1;
     }
     else 
     {

@@ -16,7 +16,7 @@
 using namespace std;
 
 #define STM32_MAX_RX_FRAME	256	/* cmd read memory */
-#define STM32_MAX_TX_FRAME	(1 + 256 + 1)	/* cmd write memory */
+#define STM32_MAX_TX_FRAME	(1 + 128 + 1)	/* cmd write memory */
 
 #define STM32_MAX_PAGES		0x0000ffff
 #define STM32_MASS_ERASE	0x00100000 /* > 2 x max_pages */
@@ -68,6 +68,7 @@ private:
         F4XX = 4,
         H7XX = 5,
         F4XX_CUSTOM = 6,
+        L031X = 7,
         COUNT,
     } ;
 
@@ -116,13 +117,13 @@ private:
     buffer      rxBuffer        = {0};
     uint8_t	    bl_version      = 0;
     uint16_t    pid             = 0;
-    bool        debug           = 0;
+    bool        debug           = 1;
     bool        time_to_exit    = false;
     bool        init_flag       = false;
     uint8_t     state           = 0;
     devices_t   *device         = NULL;
     string		filename;
-    devices_t   devices[7]      = 
+    devices_t   devices[COUNT]      = 
     {
             //{0x412, "STM32F10xxx-Low-density", 0x20000000, 0x20000FFF, 0x08000000, 0x08007FFF, 1, 0x1FFFF800, 0x1FFFF80F, 0x1FFFF000, 0x1FFFF7FF},
             {
@@ -222,6 +223,19 @@ private:
                 .optEnd = 0x1FFFF80F,
                 .sysMemStart = 0x1FFFF000,
                 .sysMemEnd = 0x1FFFF7FF,
+            },
+            {    
+                .ID = 0x425,
+                .name = "STM32L031xx",
+                .sramStart = 0x20001000,
+                .sramEnd = 0x20001FFF,
+                .flashStart = 0x08000000,
+                .flashEnd = 0x08007FFF,
+                .flashKbpp = 1,
+                .optStart = 0x1FF80000,
+                .optEnd = 0x1FF8001F,
+                .sysMemStart = 0x1FF00000,
+                .sysMemEnd = 0x1FF00FFF,
             },
     };
 

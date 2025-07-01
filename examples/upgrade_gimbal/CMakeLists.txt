@@ -1,13 +1,20 @@
 cmake_minimum_required(VERSION 3.15)
-
+project(upgrade_gimbal)
 # Specify at least C++11, better C++17
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+set(MAVLINK_INCLUDES
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../src/mavlink/include/mavlink/v2.0")
+
+set(MAVLINK_SRC
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../src")
 
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}
                     ${CMAKE_CURRENT_SOURCE_DIR}/src/parsers
                     ${MAVLINK_INCLUDES}
+                    ${MAVLINK_SRC}
                     )
 
 
