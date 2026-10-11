@@ -89,7 +89,7 @@ int main(int argc, char **argv)
     #else
     char *uart_name = (char *)"/dev/ttyUSB0";
     #endif
-    uint8_t expect_compid = 154;
+    uint8_t expect_compid = 36;
     int baudrate = 115200;
     string path = "/home/ntdat/User/gSDK/gSDK_Gitlab/gSDK/FW/STM_Router_192.bin";
     // do the parse, will throw an int if it fails

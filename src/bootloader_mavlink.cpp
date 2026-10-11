@@ -1,7 +1,7 @@
 #include <filesystem>
 #include <iostream>
 #include "bootloader_mavlink.h"
-
+#include <time.h>
 
 namespace fs = std::filesystem;
 uint32_t start_time;
@@ -9,19 +9,23 @@ uint32_t start_time;
 //   Time
 // ------------------- ---------------------------------------------------------------
 
+static uint32_t s_localTimeMsOffset = 0;
+static uint64_t s_localTimeUsOffset = 0;
 
-static uint64_t get_time_usec()
+
+static uint64_t get_time_usec(void)
 {
-    static struct timeval _timestamp;
-    gettimeofday(&_timestamp, NULL);
-    return _timestamp.tv_sec * 1000000 + _timestamp.tv_usec;
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts); // Không bao giờ bị nhảy giờ khi sync GPS/NTP
+    uint64_t us = (uint64_t)ts.tv_sec * 1000000ULL + (ts.tv_nsec / 1000ULL);
+    if (s_localTimeUsOffset == 0) {
+        s_localTimeUsOffset = us;
+    }
+    return us - s_localTimeUsOffset;
 }
-
-static uint64_t get_time_msec()
+static uint64_t get_time_msec(void)
 {
-    static struct timeval _timestamp;
-    gettimeofday(&_timestamp, NULL);
-    return _timestamp.tv_sec * 1000 + _timestamp.tv_usec / 1000;
+    return get_time_usec() / 1000;
 }
 
 static void *start_bootloader_read_thread(void *args);
@@ -129,7 +133,7 @@ bool BootloaderMavlink::run()
             err_t result = connect_seq();
             if (result == ERR_OK)
             {
-
+                GSDK_DebugInfo("serial control response");
                 state = SETBAUD;
             }
             else if (result == ERR_SKIP)
@@ -517,7 +521,7 @@ BootloaderMavlink::err_t BootloaderMavlink::parse_bin_and_send_seq()
             break;
         }
         
-        if (err > 5)
+        if (err > 15)
         {
             GSDK_DebugError("Too many error\n");
             return ERR_UNKNOWN;
@@ -655,7 +659,7 @@ void BootloaderMavlink::messages_handler(const mavlink_message_t &message)
         }
         break;
         case MAVLINK_MSG_ID_COMMAND_ACK:
-        {
+        {   printf("ACK from %d\n", message.compid );
             pthread_mutex_lock(&_messages.mutex_cmd_ack);
             mavlink_msg_command_ack_decode(&message, &_messages.cmd_ack);
             pthread_cond_signal(&_messages._condition_cmd_ack);

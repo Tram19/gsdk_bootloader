@@ -37,7 +37,7 @@
 #include "gimbal_protocol_v2.h"
 
 #include "gimbal_interface.h"
-
+#include <time.h>
 // Gimbal status 1
 enum status1_t {
     STATUS1_ERROR_NONE          = 0x00,
@@ -82,18 +82,23 @@ enum status2_t {
 // ----------------------------------------------------------------------------------
 //   Time
 // ------------------- ---------------------------------------------------------------
-static uint64_t get_time_usec()
-{
-    static struct timeval _timestamp;
-    gettimeofday(&_timestamp, NULL);
-    return _timestamp.tv_sec * 1000000 + _timestamp.tv_usec;
-}
+static uint32_t s_localTimeMsOffset = 0;
+static uint64_t s_localTimeUsOffset = 0;
 
-static uint64_t get_time_msec()
+
+static uint64_t get_time_usec(void)
 {
-    static struct timeval _timestamp;
-    gettimeofday(&_timestamp, NULL);
-    return _timestamp.tv_sec * 1000 + _timestamp.tv_usec / 1000;
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts); // Không bao giờ bị nhảy giờ khi sync GPS/NTP
+    uint64_t us = (uint64_t)ts.tv_sec * 1000000ULL + (ts.tv_nsec / 1000ULL);
+    if (s_localTimeUsOffset == 0) {
+        s_localTimeUsOffset = us;
+    }
+    return us - s_localTimeUsOffset;
+}
+static uint64_t get_time_msec(void)
+{
+    return get_time_usec() / 1000;
 }
 
 // ------------------------------------------------------------------------------
